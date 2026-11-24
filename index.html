@@ -1,0 +1,3422 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Ink & Day — Journal Calendar & Time-Block Planner</title>
+
+    <link rel="icon" type="image/png" href="icon.png" />
+    <link rel="apple-touch-icon" href="icon.png" />
+    <link rel="manifest" href="manifest.json" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Ink & Day" />
+    <meta name="theme-color" content="#FAF6F0" />
+
+    <!-- Google Fonts: Handwritten styles ('Caveat', 'Patrick Hand') paired with clean 'Nunito' -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&family=Nunito:wght@400;500;600;700;800&family=Patrick+Hand&display=swap"
+      rel="stylesheet"
+    />
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Tailwind Config for Custom Fonts & Warm Journal Palette -->
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              hand: ['"Caveat"', "cursive"],
+              journal: ['"Patrick Hand"', "cursive"],
+              sans: ['"Nunito"', "system-ui", "-apple-system", "sans-serif"],
+            },
+            colors: {
+              paper: {
+                bg: "#FAF6F0",
+                card: "#FFFDF9",
+                soft: "#F4EDE3",
+                border: "#E7DDD0",
+                dot: "#D8CCBD",
+              },
+              ink: {
+                DEFAULT: "#2D2622",
+                muted: "#7A6E66",
+                light: "#A5988E",
+                terracotta: "#C46848",
+                sage: "#4F7A52",
+              },
+            },
+            boxShadow: {
+              paper:
+                "0 4px 20px -6px rgba(68, 52, 38, 0.08), 0 1px 3px rgba(68, 52, 38, 0.05)",
+              card: "0 2px 10px -3px rgba(68, 52, 38, 0.07)",
+              float: "0 14px 34px -10px rgba(45, 38, 34, 0.18)",
+            },
+          },
+        },
+      };
+    </script>
+
+    <style>
+      /* Base Warm Paper Texture & Typography Defaults */
+      html,
+      body {
+        background-color: #faf6f0;
+        color: #2d2622;
+        font-family: "Nunito", system-ui, sans-serif;
+        -webkit-tap-highlight-color: transparent;
+        overflow-x: hidden;
+      }
+
+      /* Subtle Dot-Grid Paper Background for the Day Timeline */
+      .paper-dot-grid {
+        background-color: #fffdf9;
+        background-image: radial-gradient(#ddd1c2 1.25px, transparent 1.25px);
+        background-size: 20px 20px;
+        background-position: 6px 6px;
+      }
+
+      /* Warm Notebook Ruled Paper for the Daily Journal Pad */
+      .paper-ruled {
+        background-color: #fffdf8;
+        background-image:
+          linear-gradient(
+            90deg,
+            transparent 36px,
+            rgba(217, 138, 138, 0.28) 36px,
+            rgba(217, 138, 138, 0.28) 37.5px,
+            transparent 37.5px
+          ),
+          repeating-linear-gradient(
+            to bottom,
+            transparent 0px,
+            transparent 31px,
+            rgba(218, 204, 187, 0.65) 31px,
+            rgba(218, 204, 187, 0.65) 32px
+          );
+        line-height: 32px;
+      }
+
+      /* Subtle Washi Tape Accent on Journal Card */
+      .washi-tape {
+        background: linear-gradient(
+          135deg,
+          rgba(235, 208, 174, 0.72),
+          rgba(226, 188, 152, 0.56)
+        );
+        backdrop-filter: blur(2px);
+        transform: rotate(-2deg);
+      }
+
+      /* Hand-Drawn Scribble Strike-Through Animation */
+      .scribble-svg path {
+        stroke-dasharray: 640;
+        stroke-dashoffset: 640;
+        transition: stroke-dashoffset 0.52s cubic-bezier(0.22, 1, 0.36, 1);
+      }
+      .is-completed .scribble-svg path {
+        stroke-dashoffset: 0;
+      }
+
+      /* Hand-Drawn Checkbox Checkmark Animation */
+      .check-stroke {
+        stroke-dasharray: 60;
+        stroke-dashoffset: 60;
+        transition: stroke-dashoffset 0.34s cubic-bezier(0.22, 1, 0.36, 1) 0.04s;
+      }
+      .is-completed .check-stroke {
+        stroke-dashoffset: 0;
+      }
+
+      /* Subtask Mini Scribble */
+      .subtask-done .subtask-scribble path {
+        stroke-dashoffset: 0;
+      }
+      .subtask-scribble path {
+        stroke-dasharray: 320;
+        stroke-dashoffset: 320;
+        transition: stroke-dashoffset 0.38s ease-out;
+      }
+
+      /* Subtle Sketch Animation on Newly Completed Block */
+      @keyframes inkPop {
+        0% {
+          transform: scale(1);
+        }
+        35% {
+          transform: scale(0.985);
+        }
+        100% {
+          transform: scale(1);
+        }
+      }
+      .just-completed {
+        animation: inkPop 0.35s ease;
+      }
+
+      /* Gentle Toast Entrance */
+      @keyframes toastIn {
+        from {
+          opacity: 0;
+          transform: translate(-50%, 16px) scale(0.96);
+        }
+        to {
+          opacity: 1;
+          transform: translate(-50%, 0) scale(1);
+        }
+      }
+      .toast-enter {
+        animation: toastIn 0.25s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+      }
+
+      /* Custom Warm Scrollbar */
+      ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+      ::-webkit-scrollbar-track {
+        background: #f4ede3;
+        border-radius: 99px;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #d7c9b8;
+        border-radius: 99px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #c2b09c;
+      }
+    </style>
+  </head>
+
+  <body
+    class="min-h-screen bg-paper-bg text-ink antialiased selection:bg-[#F3DFC1] selection:text-ink"
+  >
+    <!-- ===================================================================== -->
+    <!-- TOP NAVIGATION BAR (Responsive, Sticky, Rounded Paper Aesthetic)       -->
+    <!-- ===================================================================== -->
+    <header
+      class="sticky top-0 z-30 border-b border-paper-border/80 bg-paper-bg/90 backdrop-blur-md"
+    >
+      <div class="mx-auto max-w-7xl px-3 sm:px-5 lg:px-6 py-2.5 sm:py-3">
+        <!-- Top Row: Brand, Desktop View Switcher, Utility Actions -->
+        <div class="flex flex-wrap items-center justify-between gap-2.5">
+          <!-- Brand Logo -->
+          <button
+            id="btn-brand-home"
+            type="button"
+            class="group flex items-center gap-2.5 rounded-[20px] px-2 py-1 text-left transition hover:bg-paper-soft focus:outline-none"
+            aria-label="Go to today"
+          >
+            <span
+              class="flex h-10 w-10 items-center justify-center rounded-[16px] bg-ink text-paper-card shadow-card transition group-hover:rotate-[-3deg]"
+            >
+              <!-- Hand-drawn journal pen SVG icon -->
+              <svg
+                class="h-5 w-5"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path
+                  d="M5 4.5C5 3.67 5.67 3 6.5 3h11C18.33 3 19 3.67 19 4.5v15c0 .83-.67 1.5-1.5 1.5h-11C5.67 21 5 20.33 5 19.5v-15Z"
+                />
+                <path d="M8.5 8h7" />
+                <path d="M8.5 12h5.5" />
+                <path d="M8.5 16c1.5-.8 3 .8 4.5 0" />
+              </svg>
+            </span>
+            <div class="leading-none">
+              <div
+                class="font-hand text-[26px] sm:text-[30px] font-bold tracking-wide text-ink leading-none"
+              >
+                Ink &amp; Day
+              </div>
+              <div
+                class="hidden sm:block text-[11px] font-semibold tracking-wider uppercase text-ink-muted mt-0.5"
+              >
+                Journal Time Planner
+              </div>
+            </div>
+          </button>
+
+          <!-- View Switcher Pill (Desktop Center) -->
+          <nav
+            aria-label="Calendar views"
+            class="order-3 md:order-2 w-full md:w-auto flex items-center justify-center"
+          >
+            <div
+              class="inline-flex w-full md:w-auto items-center justify-between md:justify-center gap-1 rounded-[22px] border border-paper-border bg-paper-card p-1 shadow-card"
+            >
+              <button
+                type="button"
+                data-view="day"
+                class="view-tab flex-1 md:flex-none rounded-[18px] px-3.5 sm:px-4 py-2 text-sm font-bold transition min-h-[40px]"
+              >
+                Day
+              </button>
+              <button
+                type="button"
+                data-view="week"
+                class="view-tab flex-1 md:flex-none rounded-[18px] px-3.5 sm:px-4 py-2 text-sm font-bold transition min-h-[40px]"
+              >
+                Week
+              </button>
+              <button
+                type="button"
+                data-view="month"
+                class="view-tab flex-1 md:flex-none rounded-[18px] px-3.5 sm:px-4 py-2 text-sm font-bold transition min-h-[40px]"
+              >
+                Month
+              </button>
+              <button
+                type="button"
+                data-view="year"
+                class="view-tab flex-1 md:flex-none rounded-[18px] px-3.5 sm:px-4 py-2 text-sm font-bold transition min-h-[40px]"
+              >
+                Year
+              </button>
+            </div>
+          </nav>
+
+          <!-- Right Controls: Clock Format, JSON Sync, Quick Add -->
+          <div class="order-2 md:order-3 flex items-center gap-1.5 sm:gap-2">
+            <!-- 24h / 12h toggle -->
+            <button
+              id="btn-time-format"
+              type="button"
+              title="Toggle 12h / 24h clock format"
+              class="hidden sm:inline-flex items-center justify-center rounded-[18px] border border-paper-border bg-paper-card px-3 py-2 text-xs font-extrabold text-ink-muted shadow-card transition hover:bg-paper-soft hover:text-ink min-h-[42px]"
+            >
+              24h
+            </button>
+
+            <!-- JSON Backup & Local File Sync Button -->
+            <button
+              id="btn-open-json"
+              type="button"
+              class="relative inline-flex items-center gap-1.5 rounded-[18px] border border-paper-border bg-paper-card px-3 sm:px-3.5 py-2 text-xs sm:text-sm font-bold text-ink shadow-card transition hover:bg-paper-soft min-h-[42px]"
+            >
+              <svg
+                class="h-4 w-4 text-ink-muted"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path
+                  d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
+                />
+                <polyline points="14 2 14 8 20 8" />
+                <path
+                  d="M9.5 13c-.8 0-1 .5-1 1v1c0 .5-.5 1-1 1 .5 0 1 .5 1 1v1c0 .5.2 1 1 1"
+                />
+                <path
+                  d="M14.5 13c.8 0 1 .5 1 1v1c0 .5.5 1 1 1-.5 0-1 .5-1 1v1c0 .5-.2 1-1 1"
+                />
+              </svg>
+              <span>.json</span>
+              <span
+                id="json-linked-dot"
+                class="hidden h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-paper-card"
+                title="Local .json file linked"
+              ></span>
+            </button>
+
+            <!-- Quick Add Time Block Button -->
+            <button
+              id="btn-quick-add"
+              type="button"
+              class="inline-flex items-center gap-1.5 rounded-[18px] bg-ink px-3.5 sm:px-4 py-2 text-xs sm:text-sm font-bold text-paper-card shadow-card transition hover:bg-[#3E3530] active:scale-[0.98] min-h-[42px]"
+            >
+              <svg
+                class="h-4 w-4"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.5"
+                stroke-linecap="round"
+              >
+                <path d="M12 5v14M5 12h14" />
+              </svg>
+              <span class="hidden xs:inline sm:inline">Add Block</span>
+              <span class="sm:hidden">Block</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Second Row: Period Title + Prev/Next/Today Navigation -->
+        <div
+          class="mt-2.5 flex items-center justify-between gap-2 pt-2 border-t border-paper-border/60"
+        >
+          <div class="flex items-center gap-1.5 sm:gap-2">
+            <button
+              id="btn-prev"
+              type="button"
+              aria-label="Previous period"
+              class="flex h-10 w-10 items-center justify-center rounded-[16px] border border-paper-border bg-paper-card text-ink shadow-card transition hover:bg-paper-soft active:scale-95"
+            >
+              <svg
+                class="h-4 w-4"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.4"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="m15 18-6-6 6-6" />
+              </svg>
+            </button>
+            <button
+              id="btn-next"
+              type="button"
+              aria-label="Next period"
+              class="flex h-10 w-10 items-center justify-center rounded-[16px] border border-paper-border bg-paper-card text-ink shadow-card transition hover:bg-paper-soft active:scale-95"
+            >
+              <svg
+                class="h-4 w-4"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.4"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="m9 18 6-6-6-6" />
+              </svg>
+            </button>
+            <button
+              id="btn-today"
+              type="button"
+              class="rounded-[16px] border border-paper-border bg-paper-card px-3.5 py-2 text-xs sm:text-sm font-bold text-ink shadow-card transition hover:bg-[#F7EBDC] active:scale-95 min-h-[40px]"
+            >
+              Today
+            </button>
+          </div>
+
+          <!-- Handwritten Period Heading -->
+          <h1
+            id="header-period-title"
+            class="font-hand text-2xl sm:text-3xl md:text-[34px] font-bold text-ink text-right truncate leading-tight"
+          >
+            <!-- Dynamically populated -->
+          </h1>
+        </div>
+      </div>
+    </header>
+
+    <!-- ===================================================================== -->
+    <!-- MAIN DYNAMIC VIEW CONTAINER                                           -->
+    <!-- ===================================================================== -->
+    <main
+      id="app-main"
+      class="mx-auto max-w-7xl px-3 sm:px-5 lg:px-6 py-4 sm:py-6 pb-20"
+    >
+      <!-- Active calendar or day planner view renders here -->
+    </main>
+
+    <!-- ===================================================================== -->
+    <!-- MODAL 1: ADD / EDIT TIME BLOCK                                        -->
+    <!-- ===================================================================== -->
+    <div
+      id="modal-block"
+      class="fixed inset-0 z-50 hidden items-end sm:items-center justify-center bg-ink/40 backdrop-blur-[3px] p-0 sm:p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="modal-block-title"
+    >
+      <div
+        class="w-full sm:max-w-lg max-h-[92vh] overflow-y-auto rounded-t-[28px] sm:rounded-[28px] border border-paper-border bg-paper-card p-5 sm:p-6 shadow-float"
+      >
+        <!-- Modal Header -->
+        <div
+          class="flex items-center justify-between gap-3 pb-3 border-b border-paper-border/70"
+        >
+          <div>
+            <h2
+              id="modal-block-title"
+              class="font-hand text-3xl font-bold text-ink leading-none"
+            >
+              New Time Block
+            </h2>
+            <p
+              id="modal-block-date-label"
+              class="text-xs font-semibold text-ink-muted mt-1"
+            ></p>
+          </div>
+          <button
+            type="button"
+            data-close-modal="modal-block"
+            aria-label="Close modal"
+            class="flex h-10 w-10 items-center justify-center rounded-[16px] border border-paper-border bg-paper-bg text-ink-muted transition hover:bg-paper-soft hover:text-ink"
+          >
+            <svg
+              class="h-5 w-5"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.2"
+              stroke-linecap="round"
+            >
+              <path d="M18 6 6 18M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <!-- Block Form -->
+        <form id="form-block" class="mt-4 space-y-4">
+          <input type="hidden" id="block-id" />
+          <input type="hidden" id="block-date" />
+
+          <!-- Title + Selected Emoji -->
+          <div>
+            <label
+              for="block-title"
+              class="block text-xs font-extrabold uppercase tracking-wider text-ink-muted mb-1.5"
+            >
+              What are you focusing on?
+            </label>
+            <div class="flex items-center gap-2">
+              <input
+                id="block-emoji"
+                type="text"
+                maxlength="4"
+                value="✨"
+                aria-label="Task icon or emoji"
+                class="h-12 w-14 shrink-0 rounded-[18px] border border-paper-border bg-paper-bg text-center text-2xl focus:border-ink focus:outline-none"
+              />
+              <input
+                id="block-title"
+                type="text"
+                required
+                placeholder="e.g., Deep focus design session..."
+                class="h-12 w-full rounded-[18px] border border-paper-border bg-paper-bg px-4 font-journal text-xl text-ink placeholder:text-ink-light focus:border-ink focus:bg-paper-card focus:outline-none"
+              />
+            </div>
+            <!-- Quick Emoji Strip -->
+            <div id="emoji-picker" class="mt-2 flex flex-wrap gap-1.5">
+              <!-- Populated via JS -->
+            </div>
+          </div>
+
+          <!-- Start / End Time & Quick Duration Chips -->
+          <div
+            class="rounded-[20px] border border-paper-border bg-paper-bg/70 p-3.5"
+          >
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label
+                  for="block-start"
+                  class="block text-xs font-extrabold uppercase tracking-wider text-ink-muted mb-1"
+                >
+                  Start
+                </label>
+                <input
+                  id="block-start"
+                  type="time"
+                  required
+                  class="h-11 w-full rounded-[16px] border border-paper-border bg-paper-card px-3 text-sm font-bold text-ink focus:border-ink focus:outline-none"
+                />
+              </div>
+              <div>
+                <label
+                  for="block-end"
+                  class="block text-xs font-extrabold uppercase tracking-wider text-ink-muted mb-1"
+                >
+                  End
+                </label>
+                <input
+                  id="block-end"
+                  type="time"
+                  required
+                  class="h-11 w-full rounded-[16px] border border-paper-border bg-paper-card px-3 text-sm font-bold text-ink focus:border-ink focus:outline-none"
+                />
+              </div>
+            </div>
+
+            <!-- Quick Duration Buttons -->
+            <div
+              class="mt-2.5 flex flex-wrap items-center justify-between gap-2"
+            >
+              <div class="flex flex-wrap gap-1.5">
+                <button
+                  type="button"
+                  data-dur="15"
+                  class="dur-chip rounded-[14px] border border-paper-border bg-paper-card px-2.5 py-1 text-xs font-bold text-ink-muted hover:border-ink hover:text-ink transition"
+                >
+                  15m
+                </button>
+                <button
+                  type="button"
+                  data-dur="30"
+                  class="dur-chip rounded-[14px] border border-paper-border bg-paper-card px-2.5 py-1 text-xs font-bold text-ink-muted hover:border-ink hover:text-ink transition"
+                >
+                  30m
+                </button>
+                <button
+                  type="button"
+                  data-dur="45"
+                  class="dur-chip rounded-[14px] border border-paper-border bg-paper-card px-2.5 py-1 text-xs font-bold text-ink-muted hover:border-ink hover:text-ink transition"
+                >
+                  45m
+                </button>
+                <button
+                  type="button"
+                  data-dur="60"
+                  class="dur-chip rounded-[14px] border border-paper-border bg-paper-card px-2.5 py-1 text-xs font-bold text-ink-muted hover:border-ink hover:text-ink transition"
+                >
+                  1h
+                </button>
+                <button
+                  type="button"
+                  data-dur="90"
+                  class="dur-chip rounded-[14px] border border-paper-border bg-paper-card px-2.5 py-1 text-xs font-bold text-ink-muted hover:border-ink hover:text-ink transition"
+                >
+                  1h 30m
+                </button>
+                <button
+                  type="button"
+                  data-dur="120"
+                  class="dur-chip rounded-[14px] border border-paper-border bg-paper-card px-2.5 py-1 text-xs font-bold text-ink-muted hover:border-ink hover:text-ink transition"
+                >
+                  2h
+                </button>
+              </div>
+              <span
+                id="modal-duration-preview"
+                class="text-xs font-extrabold text-ink-terracotta"
+              ></span>
+            </div>
+            <p
+              id="modal-time-error"
+              class="hidden mt-2 text-xs font-bold text-rose-700"
+            ></p>
+          </div>
+
+          <!-- Pastel Highlighter Color Swatches -->
+          <div>
+            <span
+              class="block text-xs font-extrabold uppercase tracking-wider text-ink-muted mb-1.5"
+            >
+              Highlighter Tint
+            </span>
+            <div
+              id="color-picker"
+              class="grid grid-cols-3 sm:grid-cols-6 gap-2"
+            >
+              <!-- Populated via JS -->
+            </div>
+          </div>
+
+          <!-- Subtasks Builder -->
+          <div>
+            <span
+              class="block text-xs font-extrabold uppercase tracking-wider text-ink-muted mb-1.5"
+            >
+              Mini Checklist (optional)
+            </span>
+            <div id="modal-subtasks-list" class="space-y-1.5 mb-2"></div>
+            <div class="flex gap-2">
+              <input
+                id="new-subtask-input"
+                type="text"
+                placeholder="Add a step and press +"
+                class="h-10 flex-1 rounded-[16px] border border-paper-border bg-paper-bg px-3.5 font-journal text-base text-ink placeholder:text-ink-light focus:border-ink focus:bg-paper-card focus:outline-none"
+              />
+              <button
+                id="btn-add-subtask"
+                type="button"
+                class="rounded-[16px] border border-paper-border bg-paper-soft px-3.5 text-sm font-extrabold text-ink transition hover:bg-paper-border"
+              >
+                + Add
+              </button>
+            </div>
+          </div>
+
+          <!-- Optional Notes -->
+          <div>
+            <label
+              for="block-notes"
+              class="block text-xs font-extrabold uppercase tracking-wider text-ink-muted mb-1.5"
+            >
+              Notes (optional)
+            </label>
+            <textarea
+              id="block-notes"
+              rows="2"
+              placeholder="Little reminders, links, or thoughts..."
+              class="w-full rounded-[18px] border border-paper-border bg-paper-bg px-3.5 py-2.5 font-journal text-lg text-ink placeholder:text-ink-light focus:border-ink focus:bg-paper-card focus:outline-none resize-none"
+            ></textarea>
+          </div>
+
+          <!-- Modal Footer Actions -->
+          <div
+            class="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-paper-border/70"
+          >
+            <!-- Two-step Safe Delete Button (only visible when editing) -->
+            <div id="delete-block-wrap" class="hidden">
+              <button
+                id="btn-delete-block"
+                type="button"
+                class="rounded-[16px] border border-rose-200 bg-rose-50 px-3.5 py-2.5 text-xs font-extrabold text-rose-700 transition hover:bg-rose-100 min-h-[42px]"
+              >
+                Delete
+              </button>
+            </div>
+
+            <div class="ml-auto flex items-center gap-2">
+              <button
+                type="button"
+                data-close-modal="modal-block"
+                class="rounded-[18px] border border-paper-border bg-paper-bg px-4 py-2.5 text-sm font-bold text-ink-muted transition hover:bg-paper-soft hover:text-ink min-h-[44px]"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                class="rounded-[18px] bg-ink px-5 py-2.5 text-sm font-bold text-paper-card shadow-card transition hover:bg-[#3F3630] active:scale-[0.98] min-h-[44px]"
+              >
+                Save Block
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- MODAL 2: JSON BACKUP, IMPORT & LOCAL FILE SYNC                        -->
+    <!-- ===================================================================== -->
+    <div
+      id="modal-json"
+      class="fixed inset-0 z-50 hidden items-end sm:items-center justify-center bg-ink/40 backdrop-blur-[3px] p-0 sm:p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="modal-json-title"
+    >
+      <div
+        class="w-full sm:max-w-xl max-h-[92vh] overflow-y-auto rounded-t-[28px] sm:rounded-[28px] border border-paper-border bg-paper-card p-5 sm:p-6 shadow-float"
+      >
+        <div
+          class="flex items-center justify-between gap-3 pb-3 border-b border-paper-border/70"
+        >
+          <div>
+            <h2
+              id="modal-json-title"
+              class="font-hand text-3xl font-bold text-ink leading-none"
+            >
+              .json Data &amp; Sync
+            </h2>
+            <p class="text-xs font-semibold text-ink-muted mt-1">
+              Auto-saved locally in your browser + portable .json file options
+            </p>
+          </div>
+          <button
+            type="button"
+            data-close-modal="modal-json"
+            aria-label="Close modal"
+            class="flex h-10 w-10 items-center justify-center rounded-[16px] border border-paper-border bg-paper-bg text-ink-muted transition hover:bg-paper-soft hover:text-ink"
+          >
+            <svg
+              class="h-5 w-5"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.2"
+              stroke-linecap="round"
+            >
+              <path d="M18 6 6 18M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <div class="mt-4 space-y-4">
+          <!-- Quick Stats Banner -->
+          <div
+            id="json-stats-bar"
+            class="flex flex-wrap items-center justify-between gap-2 rounded-[20px] border border-paper-border bg-paper-bg px-4 py-3 text-xs font-bold text-ink-muted"
+          >
+            <!-- Populated dynamically -->
+          </div>
+
+          <!-- Action 1 & 2: Export & Import .json -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div
+              class="rounded-[22px] border border-paper-border bg-paper-bg/60 p-4 flex flex-col justify-between"
+            >
+              <div>
+                <h3 class="font-hand text-2xl font-bold text-ink">
+                  Export .json
+                </h3>
+                <p class="text-xs text-ink-muted mt-1 leading-relaxed">
+                  Download all your time blocks and journal pages as
+                  <code class="rounded bg-paper-soft px-1 py-0.5 text-[11px]"
+                    >journal-planner-data.json</code
+                  >.
+                </p>
+              </div>
+              <button
+                id="btn-export-json"
+                type="button"
+                class="mt-3.5 w-full rounded-[16px] bg-ink px-4 py-2.5 text-sm font-bold text-paper-card shadow-card transition hover:bg-[#3F3630] min-h-[42px]"
+              >
+                Download .json
+              </button>
+            </div>
+
+            <div
+              class="rounded-[22px] border border-paper-border bg-paper-bg/60 p-4 flex flex-col justify-between"
+            >
+              <div>
+                <h3 class="font-hand text-2xl font-bold text-ink">
+                  Import .json
+                </h3>
+                <p class="text-xs text-ink-muted mt-1 leading-relaxed">
+                  Restore or merge a saved backup from your phone or laptop.
+                </p>
+                <!-- Merge vs Replace Selector -->
+                <div
+                  class="mt-2.5 flex items-center gap-3 text-xs font-bold text-ink"
+                >
+                  <label
+                    class="inline-flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <input
+                      type="radio"
+                      name="import-mode"
+                      value="merge"
+                      checked
+                      class="accent-ink"
+                    />
+                    <span>Merge</span>
+                  </label>
+                  <label
+                    class="inline-flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <input
+                      type="radio"
+                      name="import-mode"
+                      value="replace"
+                      class="accent-ink"
+                    />
+                    <span>Replace all</span>
+                  </label>
+                </div>
+              </div>
+              <input
+                id="input-import-json"
+                type="file"
+                accept=".json,application/json"
+                class="hidden"
+              />
+              <button
+                id="btn-import-json"
+                type="button"
+                class="mt-3 w-full rounded-[16px] border border-ink bg-paper-card px-4 py-2.5 text-sm font-bold text-ink transition hover:bg-paper-soft min-h-[42px]"
+              >
+                Choose .json File
+              </button>
+            </div>
+          </div>
+
+          <!-- Action 3: Link Local .json File (File System Access API) -->
+          <div
+            class="rounded-[22px] border border-paper-border bg-[#F7F1E7] p-4"
+          >
+            <div class="flex flex-wrap items-start justify-between gap-2">
+              <div>
+                <div class="flex items-center gap-2">
+                  <h3 class="font-hand text-2xl font-bold text-ink">
+                    Link Local .json File
+                  </h3>
+                  <span
+                    id="fs-status-badge"
+                    class="rounded-full bg-paper-card border border-paper-border px-2.5 py-0.5 text-[11px] font-bold text-ink-muted"
+                  >
+                    Not linked
+                  </span>
+                </div>
+                <p
+                  id="fs-description"
+                  class="text-xs text-ink-muted mt-1 leading-relaxed"
+                >
+                  On desktop Chromium browsers (Chrome, Edge, Brave), link a
+                  local
+                  <code class="rounded bg-paper-card px-1 py-0.5">.json</code>
+                  file so every edit auto-saves directly to disk.
+                </p>
+              </div>
+            </div>
+
+            <div id="fs-buttons-wrap" class="mt-3 flex flex-wrap gap-2">
+              <button
+                id="btn-link-new-json"
+                type="button"
+                class="rounded-[16px] bg-ink-sage px-4 py-2 text-xs sm:text-sm font-bold text-white shadow-card transition hover:opacity-95 min-h-[40px]"
+              >
+                Create &amp; Link .json File
+              </button>
+              <button
+                id="btn-link-open-json"
+                type="button"
+                class="rounded-[16px] border border-paper-border bg-paper-card px-4 py-2 text-xs sm:text-sm font-bold text-ink transition hover:bg-paper-soft min-h-[40px]"
+              >
+                Open &amp; Link Existing .json
+              </button>
+              <button
+                id="btn-unlink-json"
+                type="button"
+                class="hidden rounded-[16px] border border-rose-200 bg-rose-50 px-3.5 py-2 text-xs font-bold text-rose-700 transition hover:bg-rose-100 min-h-[40px]"
+              >
+                Unlink
+              </button>
+            </div>
+            <p
+              id="fs-fallback-note"
+              class="hidden mt-2.5 rounded-[14px] bg-paper-card/80 border border-paper-border px-3 py-2 text-xs text-ink-muted leading-relaxed"
+            >
+              Direct disk file-linking isn't available in this browser (e.g.,
+              Safari, mobile browsers, or embedded preview frames). Your planner
+              still auto-saves locally, and you can use
+              <strong>Export .json</strong> /
+              <strong>Import .json</strong> anytime!
+            </p>
+          </div>
+
+          <!-- Collapsible Raw JSON Preview & Copy -->
+          <details
+            class="rounded-[20px] border border-paper-border bg-paper-bg/60 p-3.5"
+          >
+            <summary
+              class="cursor-pointer select-none text-xs font-extrabold uppercase tracking-wider text-ink-muted flex items-center justify-between"
+            >
+              <span>Inspect Raw JSON Data</span>
+              <span class="text-[11px] font-semibold normal-case text-ink-light"
+                >Click to expand</span
+              >
+            </summary>
+            <div class="mt-3">
+              <div class="flex justify-end mb-2">
+                <button
+                  id="btn-copy-json"
+                  type="button"
+                  class="rounded-[12px] border border-paper-border bg-paper-card px-3 py-1.5 text-xs font-bold text-ink hover:bg-paper-soft transition"
+                >
+                  Copy JSON
+                </button>
+              </div>
+              <pre
+                id="raw-json-preview"
+                class="max-h-48 overflow-auto rounded-[14px] border border-paper-border bg-paper-card p-3 text-[11px] leading-relaxed text-ink-muted"
+              ></pre>
+            </div>
+          </details>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- CUSTOM TOAST NOTIFICATION (Replaces browser alert())                  -->
+    <!-- ===================================================================== -->
+    <div
+      id="toast-root"
+      class="pointer-events-none fixed bottom-5 left-1/2 z-[60] -translate-x-1/2"
+    ></div>
+
+    <!-- ===================================================================== -->
+    <!-- APPLICATION LOGIC                                                     -->
+    <!-- ===================================================================== -->
+    <script>
+      (function () {
+        "use strict";
+
+        /* =================================================================== */
+        /* 1. DESIGN TOKENS, PALETTE & CONSTANTS                               */
+        /* =================================================================== */
+        const STORAGE_KEY = "inkAndDay_journalPlanner_v1";
+        const PREF_KEY = "inkAndDay_prefs_v1";
+
+        const PASTEL_COLORS = {
+          sage: {
+            name: "Sage",
+            bg: "#E6F0E5",
+            border: "#BDD5BA",
+            accent: "#4E7B50",
+            pill: "#D3E6D1",
+            swatch: "#B9D6B6",
+          },
+          terracotta: {
+            name: "Terracotta",
+            bg: "#F8E6DE",
+            border: "#E6BDA9",
+            accent: "#B55B3B",
+            pill: "#F0D0C2",
+            swatch: "#E5AE96",
+          },
+          butter: {
+            name: "Butter",
+            bg: "#FDF3D6",
+            border: "#E9D28F",
+            accent: "#9A7418",
+            pill: "#F7E4AE",
+            swatch: "#F0D68A",
+          },
+          blue: {
+            name: "Dusty Blue",
+            bg: "#E3EEF7",
+            border: "#B4CCE3",
+            accent: "#3F6C94",
+            pill: "#CEE0F1",
+            swatch: "#ADC9E3",
+          },
+          lavender: {
+            name: "Lavender",
+            bg: "#EFE8F8",
+            border: "#CEBCE6",
+            accent: "#6F5099",
+            pill: "#E1D4F2",
+            swatch: "#CCB6E6",
+          },
+          peach: {
+            name: "Peach",
+            bg: "#FDECE1",
+            border: "#EFC6AC",
+            accent: "#BC663A",
+            pill: "#F9D8C3",
+            swatch: "#F2BEA0",
+          },
+        };
+
+        const QUICK_EMOJIS = [
+          "☕",
+          "✍️",
+          "💻",
+          "📚",
+          "🌿",
+          "🏃",
+          "🍽️",
+          "🧘",
+          "📞",
+          "🎨",
+          "🗂️",
+          "🛒",
+          "✨",
+          "🌙",
+          "🎯",
+          "💛",
+        ];
+
+        const JOURNAL_MOODS = [
+          { emoji: "☀️", label: "Bright" },
+          { emoji: "🌿", label: "Calm" },
+          { emoji: "✨", label: "Inspired" },
+          { emoji: "☁️", label: "Slow" },
+          { emoji: "🔥", label: "Focused" },
+          { emoji: "🌙", label: "Restful" },
+        ];
+
+        const MONTH_NAMES = [
+          "January",
+          "February",
+          "March",
+          "April",
+          "May",
+          "June",
+          "July",
+          "August",
+          "September",
+          "October",
+          "November",
+          "December",
+        ];
+        const MONTH_SHORT = [
+          "Jan",
+          "Feb",
+          "Mar",
+          "Apr",
+          "May",
+          "Jun",
+          "Jul",
+          "Aug",
+          "Sep",
+          "Oct",
+          "Nov",
+          "Dec",
+        ];
+        const DAY_NAMES = [
+          "Sunday",
+          "Monday",
+          "Tuesday",
+          "Wednesday",
+          "Thursday",
+          "Friday",
+          "Saturday",
+        ];
+        const WEEKDAY_MON_FIRST = [
+          "Mon",
+          "Tue",
+          "Wed",
+          "Thu",
+          "Fri",
+          "Sat",
+          "Sun",
+        ];
+        const WEEKDAY_INITIALS = ["M", "T", "W", "T", "F", "S", "S"];
+
+        /* =================================================================== */
+        /* 2. APPLICATION STATE                                                */
+        /* =================================================================== */
+        const todayKey = () => toDateKey(new Date());
+
+        const state = {
+          // Smart responsive default: Mobile (< 768px) -> Week View, Desktop (>= 768px) -> Month View
+          view: window.innerWidth < 768 ? "week" : "month",
+          selectedDate: todayKey(), // "YYYY-MM-DD"
+          use24h: true,
+          data: {
+            version: 1,
+            updatedAt: new Date().toISOString(),
+            blocksByDate: {},
+            journalByDate: {},
+          },
+          // Local File System Access API handle (desktop Chromium)
+          fileHandle: null,
+          linkedFileName: null,
+          // Ephemeral UI state
+          modalSubtasks: [],
+          deleteConfirmArmed: false,
+          justCompletedId: null,
+          toastTimer: null,
+          fileWriteTimer: null,
+          journalSaveTimer: null,
+        };
+
+        /* =================================================================== */
+        /* 3. DATE & TIME UTILITIES (Local Timezone Safe)                      */
+        /* =================================================================== */
+        function pad2(n) {
+          return String(n).padStart(2, "0");
+        }
+
+        function toDateKey(dateObj) {
+          return `${dateObj.getFullYear()}-${pad2(dateObj.getMonth() + 1)}-${pad2(dateObj.getDate())}`;
+        }
+
+        function parseDateKey(key) {
+          const [y, m, d] = key.split("-").map(Number);
+          return new Date(y, m - 1, d);
+        }
+
+        function addDays(dateKey, delta) {
+          const d = parseDateKey(dateKey);
+          d.setDate(d.getDate() + delta);
+          return toDateKey(d);
+        }
+
+        function addMonths(dateKey, delta) {
+          const d = parseDateKey(dateKey);
+          const day = d.getDate();
+          d.setDate(1);
+          d.setMonth(d.getMonth() + delta);
+          const maxDay = new Date(
+            d.getFullYear(),
+            d.getMonth() + 1,
+            0,
+          ).getDate();
+          d.setDate(Math.min(day, maxDay));
+          return toDateKey(d);
+        }
+
+        function getMondayOfWeek(dateKey) {
+          const d = parseDateKey(dateKey);
+          const dayOfWeek = d.getDay(); // 0 = Sun, 1 = Mon...
+          const diff = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+          d.setDate(d.getDate() + diff);
+          return toDateKey(d);
+        }
+
+        function timeToMinutes(hhmm) {
+          if (!hhmm || !hhmm.includes(":")) return 0;
+          const [h, m] = hhmm.split(":").map(Number);
+          return (h || 0) * 60 + (m || 0);
+        }
+
+        function minutesToTime(totalMins) {
+          const clamped = Math.max(
+            0,
+            Math.min(23 * 60 + 59, Math.round(totalMins)),
+          );
+          const h = Math.floor(clamped / 60);
+          const m = clamped % 60;
+          return `${pad2(h)}:${pad2(m)}`;
+        }
+
+        function formatDisplayTime(hhmm) {
+          const [h, m] = hhmm.split(":").map(Number);
+          if (state.use24h) {
+            return `${pad2(h)}:${pad2(m)}`;
+          }
+          const suffix = h >= 12 ? "PM" : "AM";
+          const h12 = h % 12 === 0 ? 12 : h % 12;
+          return `${h12}:${pad2(m)} ${suffix}`;
+        }
+
+        function formatDuration(mins) {
+          if (mins <= 0) return "0m";
+          const h = Math.floor(mins / 60);
+          const m = mins % 60;
+          if (h === 0) return `${m}m`;
+          if (m === 0) return `${h}h`;
+          return `${h}h ${m}m`;
+        }
+
+        function getHoursLeftToday() {
+          const now = new Date();
+          const currentMins = now.getHours() * 60 + now.getMinutes();
+          const totalDayMins = 24 * 60;
+          const remainingMins = Math.max(0, totalDayMins - currentMins);
+          const pctElapsed = Math.min(
+            100,
+            Math.max(0, (currentMins / totalDayMins) * 100),
+          );
+          return {
+            now,
+            currentMins,
+            remainingMins,
+            remainingText: formatDuration(remainingMins),
+            pctElapsed,
+            nowHHMM: `${pad2(now.getHours())}:${pad2(now.getMinutes())}`,
+          };
+        }
+
+        function escapeHTML(str) {
+          return String(str || "")
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#39;");
+        }
+
+        function generateId() {
+          return (
+            "blk_" +
+            Date.now().toString(36) +
+            "_" +
+            Math.random().toString(36).slice(2, 7)
+          );
+        }
+
+        /* =================================================================== */
+        /* 4. HAND-DRAWN SVG HELPERS                                           */
+        /* =================================================================== */
+        function svgTodayLoop(sizeClass = "w-11 h-10") {
+          return `
+          <svg class="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 ${sizeClass}" viewBox="0 0 64 54" fill="none" aria-hidden="true">
+            <path
+              d="M34 5C17 4.2 5.5 14 5.5 27.5C5.5 41 18.5 49 34 48.2C49.5 47.4 59 38.5 58.2 25.5C57.4 12.5 45.2 6.8 27.5 8.5"
+              stroke="#C46848"
+              stroke-width="2.6"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              opacity="0.9"
+            />
+          </svg>
+        `;
+        }
+
+        function svgScribbleLine() {
+          // Organic double-pass hand-drawn ink scribble across completed titles
+          return `
+          <svg class="scribble-svg pointer-events-none absolute inset-y-0 left-[-4px] right-[-4px] h-full w-[calc(100%+8px)]" viewBox="0 0 260 36" preserveAspectRatio="none" fill="none" aria-hidden="true">
+            <path
+              d="M3 19 C 24 13, 44 24, 68 18 C 92 12, 114 23, 140 17 C 166 11, 192 24, 218 17 C 234 13, 246 20, 257 17 M 10 22 C 42 17, 74 21, 112 19 C 154 17, 198 21, 248 18"
+              stroke="#4B3E36"
+              stroke-width="2.7"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              opacity="0.82"
+            />
+          </svg>
+        `;
+        }
+
+        function svgHandCheckbox(completed, accentColor) {
+          return `
+          <svg class="h-8 w-8 shrink-0 overflow-visible" viewBox="0 0 36 36" fill="none" aria-hidden="true">
+            <!-- Hand-drawn organic circle -->
+            <path
+              d="M18.5 4.2C10.5 3.8 4.4 9.8 4.2 18.2C4 26.5 10.6 32 18.6 31.8C26.7 31.6 32 25.4 31.8 17.6C31.6 10.1 25.6 5.2 16.4 5.5"
+              stroke="${completed ? accentColor : "#7A6E66"}"
+              stroke-width="2.2"
+              stroke-linecap="round"
+              fill="${completed ? accentColor + "22" : "#FFFDF9"}"
+            />
+            <!-- Hand-drawn checkmark -->
+            <path
+              class="check-stroke"
+              d="M10.5 18.5 C 13 21, 14.8 23.2, 16.2 24.8 C 19.5 19.5, 24 13.8, 29.5 9.2"
+              stroke="${accentColor}"
+              stroke-width="3"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+        `;
+        }
+
+        /* =================================================================== */
+        /* 5. PERSISTENCE: LOCALSTORAGE + OPTIONAL FILE SYSTEM ACCESS SYNC     */
+        /* =================================================================== */
+        function seedInitialData() {
+          const t = todayKey();
+          state.data = {
+            version: 1,
+            updatedAt: new Date().toISOString(),
+            blocksByDate: {
+              [t]: [
+                {
+                  id: generateId(),
+                  title: "Morning Coffee & Quiet Pages",
+                  start: "08:00",
+                  end: "09:00",
+                  color: "butter",
+                  emoji: "☕",
+                  notes:
+                    "Sip slowly, read two chapters, and set one calm intention for today.",
+                  subtasks: [
+                    { id: "st_1", text: "Brew pour-over coffee", done: true },
+                    { id: "st_2", text: "Pick top 3 priorities", done: true },
+                  ],
+                  completed: true,
+                },
+                {
+                  id: generateId(),
+                  title: "Deep Focus Creative Session",
+                  start: "10:00",
+                  end: "11:30",
+                  color: "sage",
+                  emoji: "✍️",
+                  notes:
+                    "Phone on Do Not Disturb. Work on the most meaningful task first.",
+                  subtasks: [
+                    { id: "st_3", text: "Sketch rough outline", done: true },
+                    {
+                      id: "st_4",
+                      text: "Finish first solid draft",
+                      done: false,
+                    },
+                  ],
+                  completed: false,
+                },
+                {
+                  id: generateId(),
+                  title: "Lunch Walk & Fresh Air",
+                  start: "13:00",
+                  end: "14:00",
+                  color: "peach",
+                  emoji: "🌿",
+                  notes: "Step away from screens and stretch outside.",
+                  subtasks: [],
+                  completed: false,
+                },
+                {
+                  id: generateId(),
+                  title: "Wrap-up, Inbox & Tomorrow’s Plan",
+                  start: "16:00",
+                  end: "17:30",
+                  color: "lavender",
+                  emoji: "🗂️",
+                  notes:
+                    "Clear open loops and block tomorrow’s morning anchor.",
+                  subtasks: [],
+                  completed: false,
+                },
+              ],
+            },
+            journalByDate: {
+              [t]: {
+                mood: "☀️",
+                gratitude: "A quiet morning start and a fresh blank page.",
+                notes:
+                  "Welcome to Ink & Day! Tap any time block circle to scribble it off, or tap an open gap between blocks to schedule more of your day.",
+              },
+            },
+          };
+        }
+
+        function loadFromStorage() {
+          try {
+            const prefsRaw = localStorage.getItem(PREF_KEY);
+            if (prefsRaw) {
+              const prefs = JSON.parse(prefsRaw);
+              if (typeof prefs.use24h === "boolean")
+                state.use24h = prefs.use24h;
+            }
+          } catch (err) {
+            console.warn("Could not load preferences:", err);
+          }
+
+          try {
+            const raw = localStorage.getItem(STORAGE_KEY);
+            if (!raw) {
+              seedInitialData();
+              saveToStorage(false);
+              return;
+            }
+            const parsed = JSON.parse(raw);
+            if (parsed && typeof parsed === "object") {
+              state.data = {
+                version: parsed.version || 1,
+                updatedAt: parsed.updatedAt || new Date().toISOString(),
+                blocksByDate:
+                  parsed.blocksByDate && typeof parsed.blocksByDate === "object"
+                    ? parsed.blocksByDate
+                    : {},
+                journalByDate:
+                  parsed.journalByDate &&
+                  typeof parsed.journalByDate === "object"
+                    ? parsed.journalByDate
+                    : {},
+              };
+            } else {
+              seedInitialData();
+              saveToStorage(false);
+            }
+          } catch (err) {
+            console.error("Failed to parse stored planner data:", err);
+            seedInitialData();
+            saveToStorage(false);
+          }
+        }
+
+        function savePreferences() {
+          try {
+            localStorage.setItem(
+              PREF_KEY,
+              JSON.stringify({ use24h: state.use24h }),
+            );
+          } catch (err) {
+            console.warn("Could not save preferences:", err);
+          }
+        }
+
+        function saveToStorage(triggerFileSync = true) {
+          state.data.updatedAt = new Date().toISOString();
+          try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(state.data));
+          } catch (err) {
+            console.error("localStorage save error:", err);
+            showToast("Storage full — export your .json backup!", "warn");
+          }
+
+          if (triggerFileSync && state.fileHandle) {
+            scheduleLocalFileWrite();
+          }
+        }
+
+        function scheduleLocalFileWrite() {
+          clearTimeout(state.fileWriteTimer);
+          state.fileWriteTimer = setTimeout(async () => {
+            await writeToLinkedFile();
+          }, 400);
+        }
+
+        async function writeToLinkedFile(showConfirmation = false) {
+          if (!state.fileHandle) return false;
+          try {
+            const writable = await state.fileHandle.createWritable();
+            await writable.write(JSON.stringify(state.data, null, 2));
+            await writable.close();
+            if (showConfirmation) {
+              showToast(`Saved to ${state.linkedFileName} ✓`);
+            }
+            return true;
+          } catch (err) {
+            console.error("Failed to write linked .json file:", err);
+            showToast("Could not write to linked .json file", "warn");
+            return false;
+          }
+        }
+
+        function getBlocksForDate(dateKey) {
+          const list = state.data.blocksByDate[dateKey] || [];
+          return [...list].sort((a, b) => {
+            const diff = timeToMinutes(a.start) - timeToMinutes(b.start);
+            if (diff !== 0) return diff;
+            return timeToMinutes(a.end) - timeToMinutes(b.end);
+          });
+        }
+
+        function getJournalForDate(dateKey) {
+          return (
+            state.data.journalByDate[dateKey] || {
+              mood: "",
+              gratitude: "",
+              notes: "",
+            }
+          );
+        }
+
+        /* =================================================================== */
+        /* 6. TOAST NOTIFICATIONS                                              */
+        /* =================================================================== */
+        function showToast(message, tone = "default") {
+          const root = document.getElementById("toast-root");
+          if (!root) return;
+          clearTimeout(state.toastTimer);
+
+          const toneClasses =
+            tone === "warn"
+              ? "bg-[#7A3528] text-white"
+              : "bg-ink text-paper-card";
+
+          root.innerHTML = `
+          <div class="toast-enter pointer-events-auto flex items-center gap-2 rounded-[20px] px-4 py-2.5 text-sm font-bold shadow-float ${toneClasses}">
+            <span>${escapeHTML(message)}</span>
+          </div>
+        `;
+
+          state.toastTimer = setTimeout(() => {
+            root.innerHTML = "";
+          }, 2800);
+        }
+
+        /* =================================================================== */
+        /* 7. RENDERING: HEADER & ACTIVE VIEW ROUTER                           */
+        /* =================================================================== */
+        function renderHeader() {
+          // Highlight active view tab
+          document.querySelectorAll(".view-tab").forEach((btn) => {
+            const active = btn.dataset.view === state.view;
+            btn.className = `view-tab flex-1 md:flex-none rounded-[18px] px-3.5 sm:px-4 py-2 text-sm font-bold transition min-h-[40px] ${
+              active
+                ? "bg-ink text-paper-card shadow-card"
+                : "text-ink-muted hover:bg-paper-soft hover:text-ink"
+            }`;
+          });
+
+          // Update 24h / 12h label
+          const fmtBtn = document.getElementById("btn-time-format");
+          if (fmtBtn) fmtBtn.textContent = state.use24h ? "24h" : "12h";
+
+          // Update linked .json dot
+          const dot = document.getElementById("json-linked-dot");
+          if (dot) dot.classList.toggle("hidden", !state.fileHandle);
+
+          // Update handwritten period title
+          const titleEl = document.getElementById("header-period-title");
+          const d = parseDateKey(state.selectedDate);
+
+          if (state.view === "day") {
+            titleEl.textContent = `${DAY_NAMES[d.getDay()]}, ${MONTH_SHORT[d.getMonth()]} ${d.getDate()}`;
+          } else if (state.view === "week") {
+            const mon = parseDateKey(getMondayOfWeek(state.selectedDate));
+            const sun = new Date(mon);
+            sun.setDate(mon.getDate() + 6);
+            if (mon.getMonth() === sun.getMonth()) {
+              titleEl.textContent = `${MONTH_SHORT[mon.getMonth()]} ${mon.getDate()} – ${sun.getDate()}, ${mon.getFullYear()}`;
+            } else {
+              titleEl.textContent = `${MONTH_SHORT[mon.getMonth()]} ${mon.getDate()} – ${MONTH_SHORT[sun.getMonth()]} ${sun.getDate()}, ${sun.getFullYear()}`;
+            }
+          } else if (state.view === "month") {
+            titleEl.textContent = `${MONTH_NAMES[d.getMonth()]} ${d.getFullYear()}`;
+          } else {
+            titleEl.textContent = `${d.getFullYear()} Journal`;
+          }
+        }
+
+        function renderApp() {
+          renderHeader();
+          const main = document.getElementById("app-main");
+          if (!main) return;
+
+          if (state.view === "day") {
+            main.innerHTML = renderDayPlannerView();
+            attachDayViewEvents();
+          } else if (state.view === "week") {
+            main.innerHTML = renderWeekView();
+          } else if (state.view === "month") {
+            main.innerHTML = renderMonthView();
+          } else {
+            main.innerHTML = renderYearView();
+          }
+        }
+
+        /* =================================================================== */
+        /* 8. DAY PLANNER VIEW (Structured-Style Vertical Timeline + Journal)  */
+        /* =================================================================== */
+        function renderDayPlannerView() {
+          const dateKey = state.selectedDate;
+          const tKey = todayKey();
+          const isToday = dateKey === tKey;
+          const d = parseDateKey(dateKey);
+          const blocks = getBlocksForDate(dateKey);
+          const journal = getJournalForDate(dateKey);
+          const dayClock = getHoursLeftToday();
+
+          // Compute stats for viewed date
+          const completedCount = blocks.filter((b) => b.completed).length;
+          const totalPlannedMins = blocks.reduce(
+            (acc, b) =>
+              acc + Math.max(0, timeToMinutes(b.end) - timeToMinutes(b.start)),
+            0,
+          );
+
+          // Mini 7-day ribbon for effortless adjacent-day hopping inside Day Planner
+          const monKey = getMondayOfWeek(dateKey);
+          const weekRibbonHTML = Array.from({ length: 7 }, (_, i) => {
+            const dk = addDays(monKey, i);
+            const dd = parseDateKey(dk);
+            const selected = dk === dateKey;
+            const isT = dk === tKey;
+            const count = (state.data.blocksByDate[dk] || []).length;
+            return `
+            <button
+              type="button"
+              data-open-day="${dk}"
+              class="relative flex flex-col items-center justify-center rounded-[18px] py-2 px-1 transition min-h-[58px] ${
+                selected
+                  ? "bg-ink text-paper-card shadow-card"
+                  : "bg-paper-card/80 text-ink hover:bg-paper-soft border border-paper-border/80"
+              }"
+            >
+              <span class="text-[10px] font-extrabold uppercase tracking-wider ${selected ? "text-paper-border" : "text-ink-muted"}">
+                ${WEEKDAY_MON_FIRST[i]}
+              </span>
+              <span class="relative font-hand text-2xl font-bold leading-none mt-0.5">
+                ${dd.getDate()}
+                ${isT && !selected ? svgTodayLoop("w-9 h-8") : ""}
+              </span>
+              <span class="mt-1 flex gap-0.5 h-1.5">
+                ${count > 0 ? `<span class="h-1.5 w-1.5 rounded-full ${selected ? "bg-[#F0C6AC]" : "bg-ink-terracotta"}"></span>` : ""}
+                ${count > 2 ? `<span class="h-1.5 w-1.5 rounded-full ${selected ? "bg-[#BDD5BA]" : "bg-ink-sage"}"></span>` : ""}
+              </span>
+            </button>
+          `;
+          }).join("");
+
+          // Build chronological timeline with dashed open-gap connectors & live "Now" indicator
+          let timelineHTML = "";
+          if (blocks.length === 0) {
+            timelineHTML = `
+            <div class="flex flex-col items-center justify-center text-center py-12 px-4">
+              <div class="flex h-16 w-16 items-center justify-center rounded-[22px] bg-paper-soft border border-paper-border text-3xl shadow-card mb-3">
+                🪶
+              </div>
+              <h3 class="font-hand text-3xl font-bold text-ink">A Fresh Blank Page</h3>
+              <p class="mt-1 max-w-sm font-journal text-lg text-ink-muted">
+                No time blocks sketched for ${isToday ? "today" : MONTH_SHORT[d.getMonth()] + " " + d.getDate()} yet. Start shaping your day one block at a time.
+              </p>
+              <div class="mt-5 flex flex-wrap justify-center gap-2.5">
+                <button
+                  type="button"
+                  data-gap-start="09:00"
+                  data-gap-end="10:00"
+                  class="rounded-[18px] bg-ink px-4 py-2.5 text-sm font-bold text-paper-card shadow-card transition hover:bg-[#3E3530] min-h-[44px]"
+                >
+                  + Block Morning (09:00)
+                </button>
+                <button
+                  type="button"
+                  data-gap-start="14:00"
+                  data-gap-end="15:00"
+                  class="rounded-[18px] border border-paper-border bg-paper-card px-4 py-2.5 text-sm font-bold text-ink shadow-card transition hover:bg-paper-soft min-h-[44px]"
+                >
+                  + Block Afternoon (14:00)
+                </button>
+              </div>
+            </div>
+          `;
+          } else {
+            let highWaterEnd = null;
+            let nowInserted = false;
+            const nowMins = dayClock.currentMins;
+
+            // Subtle Morning Open Gap if first block starts at or after 08:30
+            const firstStartMins = timeToMinutes(blocks[0].start);
+            if (firstStartMins >= 8 * 60 + 30) {
+              const morningStart = "07:00";
+              const gapMins = firstStartMins - timeToMinutes(morningStart);
+              if (gapMins >= 30) {
+                timelineHTML += renderOpenGapConnector(
+                  morningStart,
+                  blocks[0].start,
+                  gapMins,
+                  "Morning open",
+                );
+              }
+            }
+
+            blocks.forEach((blk, idx) => {
+              const bStart = timeToMinutes(blk.start);
+              const bEnd = timeToMinutes(blk.end);
+              const isOverlap = highWaterEnd !== null && bStart < highWaterEnd;
+
+              // Insert Open Gap Connector between previous highWaterEnd and current block start
+              if (highWaterEnd !== null && bStart - highWaterEnd >= 15) {
+                const gapStartStr = minutesToTime(highWaterEnd);
+                // Insert "Now" indicator inside gap if current time falls here
+                if (
+                  isToday &&
+                  !nowInserted &&
+                  nowMins >= highWaterEnd &&
+                  nowMins < bStart
+                ) {
+                  timelineHTML += renderNowMarker(dayClock.nowHHMM);
+                  nowInserted = true;
+                }
+                timelineHTML += renderOpenGapConnector(
+                  gapStartStr,
+                  blk.start,
+                  bStart - highWaterEnd,
+                );
+              }
+
+              // Insert "Now" indicator right before block if needed
+              if (isToday && !nowInserted && nowMins <= bStart) {
+                timelineHTML += renderNowMarker(dayClock.nowHHMM);
+                nowInserted = true;
+              }
+
+              timelineHTML += renderTimeBlockCard(blk, isOverlap);
+
+              // Track if Now is inside this block (handled visually on card too)
+              if (
+                isToday &&
+                !nowInserted &&
+                nowMins > bStart &&
+                nowMins < bEnd
+              ) {
+                nowInserted = true;
+              }
+
+              highWaterEnd =
+                highWaterEnd === null ? bEnd : Math.max(highWaterEnd, bEnd);
+
+              // After the very last block, show remaining open evening slot if before 22:30
+              if (idx === blocks.length - 1) {
+                if (isToday && !nowInserted && nowMins >= highWaterEnd) {
+                  timelineHTML += renderNowMarker(dayClock.nowHHMM);
+                  nowInserted = true;
+                }
+                if (highWaterEnd <= 22 * 60) {
+                  const suggestedEnd = minutesToTime(
+                    Math.min(23 * 60 + 30, highWaterEnd + 60),
+                  );
+                  const remainingEvening = 23 * 60 - highWaterEnd;
+                  timelineHTML += renderOpenGapConnector(
+                    minutesToTime(highWaterEnd),
+                    suggestedEnd,
+                    remainingEvening > 0 ? remainingEvening : 60,
+                    "Open later",
+                  );
+                }
+              }
+            });
+          }
+
+          // Day Status Label relative to Today
+          let relativeDayBadge = "";
+          if (isToday) {
+            relativeDayBadge = `<span class="rounded-full bg-[#F8E6DE] border border-[#E6BDA9] px-3 py-0.5 text-xs font-extrabold text-[#B55B3B]">Today</span>`;
+          } else if (dateKey < tKey) {
+            relativeDayBadge = `<span class="rounded-full bg-paper-soft border border-paper-border px-3 py-0.5 text-xs font-bold text-ink-muted">Past Page</span>`;
+          } else {
+            relativeDayBadge = `<span class="rounded-full bg-[#E6F0E5] border border-[#BDD5BA] px-3 py-0.5 text-xs font-extrabold text-[#4E7B50]">Upcoming</span>`;
+          }
+
+          return `
+          <div class="space-y-4 sm:space-y-5">
+            <!-- Mini Week Quick-Hop Strip -->
+            <div class="grid grid-cols-7 gap-1.5 sm:gap-2">
+              ${weekRibbonHTML}
+            </div>
+
+            <!-- Hours Left in the Day + Viewed Date Progress Hero Banner -->
+            <section class="rounded-[24px] border border-paper-border bg-paper-card p-4 sm:p-5 shadow-paper">
+              <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <!-- Left: Handwritten Day Title & Stats -->
+                <div>
+                  <div class="flex flex-wrap items-center gap-2">
+                    <h2 class="font-hand text-3xl sm:text-4xl font-bold text-ink leading-none">
+                      ${DAY_NAMES[d.getDay()]}, ${MONTH_NAMES[d.getMonth()]} ${d.getDate()}
+                    </h2>
+                    ${relativeDayBadge}
+                  </div>
+                  <div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs sm:text-sm font-bold text-ink-muted">
+                    <span class="inline-flex items-center gap-1.5">
+                      <span class="h-2.5 w-2.5 rounded-full bg-ink-sage"></span>
+                      ${completedCount} / ${blocks.length} blocks scribbled off
+                    </span>
+                    <span class="inline-flex items-center gap-1.5">
+                      <span class="h-2.5 w-2.5 rounded-full bg-ink-terracotta"></span>
+                      ${formatDuration(totalPlannedMins)} planned
+                    </span>
+                  </div>
+                </div>
+
+                <!-- Right: Live Hours Left in Today Countdown & Hand-Drawn Progress Bar -->
+                <div class="w-full md:w-80 lg:w-96 rounded-[20px] border border-paper-border bg-paper-bg p-3.5">
+                  <div class="flex items-baseline justify-between gap-2">
+                    <div class="flex items-center gap-1.5">
+                      <span class="text-base" aria-hidden="true">⏳</span>
+                      <span id="live-hours-left-text" class="font-hand text-2xl sm:text-[26px] font-bold text-ink leading-none">
+                        ${dayClock.remainingText} left in today
+                      </span>
+                    </div>
+                    <span id="live-clock-now" class="text-xs font-extrabold text-ink-muted">
+                      ${formatDisplayTime(dayClock.nowHHMM)}
+                    </span>
+                  </div>
+                  <!-- Hand-drawn style progress bar -->
+                  <div class="mt-2.5 relative h-3.5 w-full overflow-hidden rounded-full border-[1.5px] border-ink/35 bg-paper-card p-0.5">
+                    <div
+                      id="live-day-progress-bar"
+                      class="h-full rounded-full transition-all duration-700"
+                      style="width: ${dayClock.pctElapsed.toFixed(1)}%; background: linear-gradient(90deg, #D9B08C, #C46848);"
+                    ></div>
+                  </div>
+                  <div class="mt-1.5 flex items-center justify-between text-[11px] font-bold text-ink-muted">
+                    <span>00:00</span>
+                    <span id="live-day-pct">${Math.round(dayClock.pctElapsed)}% of today passed</span>
+                    <span>24:00</span>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <!-- Main Two-Column Journal Workspace: Timeline (Left) + Ruled Journal Pad (Right) -->
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+              <!-- VISUAL TIME-BLOCKING TIMELINE -->
+              <section class="lg:col-span-7 xl:col-span-8 rounded-[26px] border border-paper-border paper-dot-grid p-4 sm:p-6 shadow-paper">
+                <div class="flex items-center justify-between gap-2 mb-4 pb-3 border-b border-paper-border/80">
+                  <div>
+                    <h3 class="font-hand text-3xl font-bold text-ink leading-none">Day Timeline</h3>
+                    <p class="text-xs font-semibold text-ink-muted mt-0.5">
+                      Tap a circle to scribble off • Tap open gaps to block time
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    data-quick-add-day="${dateKey}"
+                    class="rounded-[16px] border border-paper-border bg-paper-card px-3.5 py-2 text-xs sm:text-sm font-bold text-ink shadow-card transition hover:bg-paper-soft min-h-[40px]"
+                  >
+                    + Time Block
+                  </button>
+                </div>
+
+                <div class="space-y-1">
+                  ${timelineHTML}
+                </div>
+              </section>
+
+              <!-- LINED-PAPER DAILY JOURNAL & BRAIN DUMP PAD -->
+              <aside class="lg:col-span-5 xl:col-span-4 relative rounded-[26px] border border-paper-border bg-[#FFFDF8] shadow-paper overflow-hidden">
+                <!-- Decorative Washi Tape -->
+                <div class="washi-tape pointer-events-none absolute -top-2 left-1/2 -translate-x-1/2 h-5 w-24 rounded-sm opacity-90"></div>
+
+                <div class="p-4 sm:p-5 pb-3 border-b border-paper-border/80 bg-[#FAF4EA]/60">
+                  <div class="flex items-center justify-between gap-2">
+                    <h3 class="font-hand text-3xl font-bold text-ink leading-none">Daily Journal</h3>
+                    <span id="journal-save-status" class="text-[11px] font-bold text-ink-sage opacity-0 transition-opacity duration-300">
+                      Saved ✓
+                    </span>
+                  </div>
+                  <p class="text-xs font-semibold text-ink-muted mt-0.5">
+                    Brain dump, reflections &amp; little notes
+                  </p>
+
+                  <!-- Ink Mood Stamps -->
+                  <div class="mt-3 flex items-center justify-between gap-1">
+                    ${JOURNAL_MOODS.map((m) => {
+                      const active = journal.mood === m.emoji;
+                      return `
+                        <button
+                          type="button"
+                          data-mood="${m.emoji}"
+                          title="${m.label}"
+                          class="relative flex h-10 w-10 items-center justify-center rounded-[14px] text-lg transition ${
+                            active
+                              ? "bg-paper-card shadow-card scale-105"
+                              : "hover:bg-paper-card/70 opacity-70 hover:opacity-100"
+                          }"
+                        >
+                          <span>${m.emoji}</span>
+                          ${active ? svgTodayLoop("w-10 h-10") : ""}
+                        </button>
+                      `;
+                    }).join("")}
+                  </div>
+
+                  <!-- Quick Gratitude / Top Intention Line -->
+                  <div class="mt-3">
+                    <label for="journal-gratitude" class="block text-[11px] font-extrabold uppercase tracking-wider text-ink-muted mb-1">
+                      Today’s Anchor / Gratitude
+                    </label>
+                    <input
+                      id="journal-gratitude"
+                      type="text"
+                      value="${escapeHTML(journal.gratitude)}"
+                      placeholder="One thing that matters most today..."
+                      class="w-full rounded-[14px] border border-paper-border bg-paper-card px-3 py-2 font-journal text-lg text-ink placeholder:text-ink-light focus:border-ink focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <!-- Ruled Notebook Paper Textarea -->
+                <div class="paper-ruled pl-12 pr-4 py-2 min-h-[280px] sm:min-h-[340px]">
+                  <textarea
+                    id="journal-notes"
+                    rows="10"
+                    placeholder="Write freely here... thoughts, sketches of ideas, reminders, or how today felt."
+                    class="w-full min-h-[260px] sm:min-h-[320px] bg-transparent font-journal text-[19px] leading-[32px] text-ink placeholder:text-ink-light/80 focus:outline-none resize-y"
+                  >${escapeHTML(journal.notes)}</textarea>
+                </div>
+              </aside>
+            </div>
+          </div>
+        `;
+        }
+
+        function renderOpenGapConnector(
+          startHHMM,
+          endHHMM,
+          gapMins,
+          customPrefix = "",
+        ) {
+          const label = customPrefix
+            ? `+ ${formatDuration(gapMins)} ${customPrefix.toLowerCase()} — tap to block`
+            : `+ ${formatDuration(gapMins)} open — tap to block`;
+          return `
+          <div class="flex items-stretch gap-3 sm:gap-4 py-1">
+            <!-- Left Rail Alignment -->
+            <div class="w-14 sm:w-16 shrink-0 flex justify-center">
+              <div class="w-0 border-l-2 border-dashed border-paper-dot my-0.5"></div>
+            </div>
+            <!-- Clickable Dashed Gap Pill -->
+            <button
+              type="button"
+              data-gap-start="${startHHMM}"
+              data-gap-end="${endHHMM}"
+              class="group my-1 flex flex-1 items-center justify-between gap-2 rounded-[16px] border border-dashed border-paper-dot bg-paper-bg/75 px-3.5 py-2 text-left transition hover:border-ink-terracotta hover:bg-[#FBF3E8] active:scale-[0.99] min-h-[40px]"
+            >
+              <span class="font-journal text-base sm:text-[17px] text-ink-muted group-hover:text-ink transition">
+                ${label}
+              </span>
+              <span class="hidden sm:inline text-[11px] font-bold text-ink-light group-hover:text-ink-terracotta">
+                ${formatDisplayTime(startHHMM)} – ${formatDisplayTime(endHHMM)}
+              </span>
+            </button>
+          </div>
+        `;
+        }
+
+        function renderNowMarker(nowHHMM) {
+          return `
+          <div class="flex items-center gap-3 sm:gap-4 py-1.5" aria-label="Current time">
+            <div class="w-14 sm:w-16 shrink-0 text-right">
+              <span class="inline-block rounded-full bg-ink-terracotta px-2 py-0.5 text-[10px] font-extrabold text-white">
+                ${formatDisplayTime(nowHHMM)}
+              </span>
+            </div>
+            <div class="flex flex-1 items-center gap-2">
+              <span class="h-2.5 w-2.5 rounded-full bg-ink-terracotta ring-4 ring-ink-terracotta/20"></span>
+              <div class="h-[2px] flex-1 border-t-2 border-dashed border-ink-terracotta/70"></div>
+              <span class="font-hand text-lg font-bold text-ink-terracotta leading-none">Now</span>
+            </div>
+          </div>
+        `;
+        }
+
+        function renderTimeBlockCard(blk, isOverlap) {
+          const theme = PASTEL_COLORS[blk.color] || PASTEL_COLORS.sage;
+          const durMins = Math.max(
+            0,
+            timeToMinutes(blk.end) - timeToMinutes(blk.start),
+          );
+          const justDone = state.justCompletedId === blk.id;
+          const subtasks = Array.isArray(blk.subtasks) ? blk.subtasks : [];
+          const completedClass = blk.completed ? "is-completed" : "";
+          const popClass = justDone ? "just-completed" : "";
+
+          return `
+          <article
+            class="flex items-stretch gap-3 sm:gap-4 py-1.5 ${completedClass} ${popClass}"
+            data-block-id="${blk.id}"
+          >
+            <!-- Left Structured-Style Time Rail -->
+            <div class="w-14 sm:w-16 shrink-0 flex flex-col items-center justify-between py-1.5">
+              <span class="text-xs font-extrabold text-ink leading-none">
+                ${formatDisplayTime(blk.start)}
+              </span>
+              <div class="my-1.5 flex flex-1 flex-col items-center">
+                <div
+                  class="flex h-10 w-10 items-center justify-center rounded-[15px] border-2 bg-paper-card text-xl shadow-card transition ${blk.completed ? "opacity-65 grayscale-[30%]" : ""}"
+                  style="border-color: ${theme.border};"
+                >
+                  ${escapeHTML(blk.emoji || "✨")}
+                </div>
+                <div
+                  class="mt-1.5 w-1.5 flex-1 min-h-[14px] rounded-full"
+                  style="background-color: ${blk.completed ? "#D5CBBF" : theme.border};"
+                ></div>
+              </div>
+              <span class="text-[11px] font-bold text-ink-muted leading-none">
+                ${formatDisplayTime(blk.end)}
+              </span>
+            </div>
+
+            <!-- Right Time-Block Paper Card -->
+            <div
+              class="group relative flex-1 rounded-[22px] border-[1.5px] p-3.5 sm:p-4 shadow-card transition-all duration-300 ${
+                blk.completed
+                  ? "opacity-75 saturate-[0.68]"
+                  : "hover:shadow-paper"
+              }"
+              style="background-color: ${theme.bg}; border-color: ${theme.border};"
+            >
+              <div class="flex items-start justify-between gap-2.5">
+                <!-- Hand-Drawn Checkbox Toggle -->
+                <button
+                  type="button"
+                  data-toggle-block="${blk.id}"
+                  aria-label="${blk.completed ? "Mark as incomplete" : "Mark as complete"}"
+                  aria-pressed="${blk.completed ? "true" : "false"}"
+                  class="mt-0.5 flex h-10 w-10 -ml-1 -mt-1 shrink-0 items-center justify-center rounded-full transition hover:scale-105 active:scale-95"
+                >
+                  ${svgHandCheckbox(blk.completed, theme.accent)}
+                </button>
+
+                <!-- Block Body (click to edit) -->
+                <div class="min-w-0 flex-1 cursor-pointer" data-edit-block="${blk.id}">
+                  <!-- Time & Duration Badges -->
+                  <div class="flex flex-wrap items-center gap-1.5 mb-1">
+                    <span
+                      class="rounded-full px-2.5 py-0.5 text-[11px] font-extrabold"
+                      style="background-color: ${theme.pill}; color: ${theme.accent};"
+                    >
+                      ${formatDuration(durMins)}
+                    </span>
+                    <span class="text-[11px] font-bold text-ink-muted">
+                      ${formatDisplayTime(blk.start)} – ${formatDisplayTime(blk.end)}
+                    </span>
+                    ${
+                      isOverlap
+                        ? `<span class="rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-extrabold text-rose-700">Overlaps</span>`
+                        : ""
+                    }
+                  </div>
+
+                  <!-- Handwritten Title with Animated Hand-Drawn SVG Scribble -->
+                  <div class="relative inline-block max-w-full">
+                    <h4 class="font-journal text-[21px] sm:text-[23px] font-normal leading-snug text-ink break-words">
+                      ${escapeHTML(blk.title)}
+                    </h4>
+                    ${svgScribbleLine()}
+                  </div>
+
+                  <!-- Optional Notes -->
+                  ${
+                    blk.notes
+                      ? `<p class="mt-1 font-journal text-base text-ink-muted leading-snug">${escapeHTML(blk.notes)}</p>`
+                      : ""
+                  }
+
+                  <!-- Optional Subtasks -->
+                  ${
+                    subtasks.length > 0
+                      ? `
+                        <div class="mt-2.5 space-y-1.5 pt-2 border-t" style="border-color: ${theme.border}80;">
+                          ${subtasks
+                            .map(
+                              (st) => `
+                                <button
+                                  type="button"
+                                  data-toggle-subtask="${blk.id}::${st.id}"
+                                  class="subtask-btn flex w-full items-center gap-2 text-left rounded-[10px] px-1.5 py-1 hover:bg-white/40 transition ${st.done ? "subtask-done opacity-70" : ""}"
+                                >
+                                  <span
+                                    class="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-[1.5px] text-[10px] font-bold"
+                                    style="border-color: ${theme.accent}; background-color: ${st.done ? theme.accent : "#FFFDF9"}; color: white;"
+                                  >
+                                    ${st.done ? "✓" : ""}
+                                  </span>
+                                  <span class="relative inline-block font-journal text-[16px] text-ink leading-tight">
+                                    ${escapeHTML(st.text)}
+                                    <svg class="subtask-scribble pointer-events-none absolute inset-y-0 left-[-2px] w-[calc(100%+4px)] h-full" viewBox="0 0 180 22" preserveAspectRatio="none" fill="none">
+                                      <path d="M2 12 C 38 9, 86 15, 130 11 C 154 9, 168 13, 178 11" stroke="#4B3E36" stroke-width="2" stroke-linecap="round" />
+                                    </svg>
+                                  </span>
+                                </button>
+                              `,
+                            )
+                            .join("")}
+                        </div>
+                      `
+                      : ""
+                  }
+                </div>
+
+                <!-- Edit Button -->
+                <button
+                  type="button"
+                  data-edit-block="${blk.id}"
+                  aria-label="Edit time block"
+                  class="flex h-9 w-9 shrink-0 items-center justify-center rounded-[14px] bg-paper-card/70 text-ink-muted transition hover:bg-paper-card hover:text-ink"
+                >
+                  <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 20h9" />
+                    <path d="M16.5 3.5a2.12 2.12 0 1 1 3 3L7 19l-4 1 1-4Z" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </article>
+        `;
+        }
+
+        /* =================================================================== */
+        /* 9. WEEK VIEW (Mobile Default: Strip + Stacked Cards; Desktop: 7-Col)*/
+        /* =================================================================== */
+        function renderWeekView() {
+          const monKey = getMondayOfWeek(state.selectedDate);
+          const tKey = todayKey();
+          const days = Array.from({ length: 7 }, (_, i) => addDays(monKey, i));
+
+          // Mobile Top Thumb-Friendly 7-Day Strip
+          const mobileStripHTML = days
+            .map((dk, i) => {
+              const d = parseDateKey(dk);
+              const isT = dk === tKey;
+              const blocks = getBlocksForDate(dk);
+              const doneCount = blocks.filter((b) => b.completed).length;
+              return `
+              <button
+                type="button"
+                data-open-day="${dk}"
+                class="relative flex flex-col items-center justify-center rounded-[18px] border border-paper-border bg-paper-card py-2.5 px-1 shadow-card transition active:scale-95 hover:bg-paper-soft min-h-[68px]"
+              >
+                <span class="text-[10px] font-extrabold uppercase tracking-wider text-ink-muted">
+                  ${WEEKDAY_MON_FIRST[i]}
+                </span>
+                <span class="relative font-hand text-[26px] font-bold leading-none mt-0.5 text-ink">
+                  ${d.getDate()}
+                  ${isT ? svgTodayLoop("w-10 h-9") : ""}
+                </span>
+                <div class="mt-1.5 flex items-center gap-0.5 h-1.5">
+                  ${
+                    blocks.length === 0
+                      ? `<span class="h-1 w-1 rounded-full bg-paper-border"></span>`
+                      : blocks
+                          .slice(0, 4)
+                          .map((b) => {
+                            const c = (
+                              PASTEL_COLORS[b.color] || PASTEL_COLORS.sage
+                            ).accent;
+                            return `<span class="h-1.5 w-1.5 rounded-full" style="background-color: ${c}; opacity: ${b.completed ? 0.4 : 1};"></span>`;
+                          })
+                          .join("")
+                  }
+                </div>
+                ${doneCount > 0 && doneCount === blocks.length ? `<span class="sr-only">All completed</span>` : ""}
+              </button>
+            `;
+            })
+            .join("");
+
+          // Mobile Stacked Daily Overview Cards (< 768px)
+          const mobileCardsHTML = days
+            .map((dk, i) => {
+              const d = parseDateKey(dk);
+              const isT = dk === tKey;
+              const blocks = getBlocksForDate(dk);
+              const doneCount = blocks.filter((b) => b.completed).length;
+              const journal = getJournalForDate(dk);
+
+              return `
+              <article
+                data-open-day="${dk}"
+                class="cursor-pointer rounded-[24px] border ${
+                  isT
+                    ? "border-[#DFB49D] bg-[#FFFBF6]"
+                    : "border-paper-border bg-paper-card"
+                } p-4 shadow-paper transition active:scale-[0.99] hover:border-ink/30"
+              >
+                <div class="flex items-center justify-between gap-2 pb-2.5 border-b border-paper-border/70">
+                  <div class="flex items-center gap-3">
+                    <div class="relative flex h-11 w-11 items-center justify-center rounded-[16px] bg-paper-bg font-hand text-[28px] font-bold text-ink">
+                      ${d.getDate()}
+                      ${isT ? svgTodayLoop("w-12 h-11") : ""}
+                    </div>
+                    <div>
+                      <div class="flex items-center gap-2">
+                        <h3 class="font-hand text-2xl font-bold text-ink leading-none">
+                          ${DAY_NAMES[d.getDay()]}
+                        </h3>
+                        ${isT ? `<span class="rounded-full bg-[#F8E6DE] px-2 py-0.5 text-[10px] font-extrabold text-ink-terracotta">Today</span>` : ""}
+                        ${journal.mood ? `<span class="text-sm">${journal.mood}</span>` : ""}
+                      </div>
+                      <p class="text-xs font-semibold text-ink-muted">
+                        ${MONTH_SHORT[d.getMonth()]} ${d.getDate()} • ${
+                          blocks.length === 0
+                            ? "Open day"
+                            : `${doneCount}/${blocks.length} done`
+                        }
+                      </p>
+                    </div>
+                  </div>
+                  <span class="rounded-[14px] bg-paper-soft px-3 py-1.5 text-xs font-bold text-ink">
+                    Plan →
+                  </span>
+                </div>
+
+                <!-- Scheduled Block Previews -->
+                <div class="mt-3 space-y-2">
+                  ${
+                    blocks.length === 0
+                      ? `<p class="font-journal text-base text-ink-light italic">Tap to open day planner &amp; sketch your time blocks...</p>`
+                      : blocks
+                          .slice(0, 4)
+                          .map((b) => {
+                            const theme =
+                              PASTEL_COLORS[b.color] || PASTEL_COLORS.sage;
+                            return `
+                              <div
+                                class="flex items-center justify-between gap-2 rounded-[15px] border px-3 py-2 ${b.completed ? "opacity-65" : ""}"
+                                style="background-color: ${theme.bg}; border-color: ${theme.border};"
+                              >
+                                <div class="flex items-center gap-2 min-w-0">
+                                  <span class="text-base shrink-0">${escapeHTML(b.emoji || "✨")}</span>
+                                  <span class="font-journal text-[17px] text-ink truncate ${b.completed ? "line-through decoration-2 decoration-[#4B3E36]/70" : ""}">
+                                    ${escapeHTML(b.title)}
+                                  </span>
+                                </div>
+                                <span class="shrink-0 text-[11px] font-extrabold" style="color: ${theme.accent};">
+                                  ${formatDisplayTime(b.start)}
+                                </span>
+                              </div>
+                            `;
+                          })
+                          .join("")
+                  }
+                  ${
+                    blocks.length > 4
+                      ? `<p class="text-xs font-bold text-ink-muted pl-1">+ ${blocks.length - 4} more blocks</p>`
+                      : ""
+                  }
+                </div>
+              </article>
+            `;
+            })
+            .join("");
+
+          // Desktop 7-Column Rounded Week Board (>= 768px)
+          const desktopBoardHTML = days
+            .map((dk, i) => {
+              const d = parseDateKey(dk);
+              const isT = dk === tKey;
+              const blocks = getBlocksForDate(dk);
+              const doneCount = blocks.filter((b) => b.completed).length;
+              const journal = getJournalForDate(dk);
+
+              return `
+              <div
+                data-open-day="${dk}"
+                class="group cursor-pointer flex flex-col rounded-[24px] border ${
+                  isT
+                    ? "border-[#DFB49D] bg-[#FFFBF6]"
+                    : "border-paper-border bg-paper-card"
+                } p-3 shadow-paper transition hover:-translate-y-0.5 hover:border-ink/35 min-h-[430px]"
+              >
+                <!-- Column Day Header -->
+                <div class="flex flex-col items-center pb-3 border-b border-paper-border/70">
+                  <span class="text-[11px] font-extrabold uppercase tracking-wider text-ink-muted">
+                    ${WEEKDAY_MON_FIRST[i]}
+                  </span>
+                  <div class="relative mt-1 flex h-11 w-11 items-center justify-center font-hand text-[32px] font-bold text-ink">
+                    ${d.getDate()}
+                    ${isT ? svgTodayLoop("w-12 h-11") : ""}
+                  </div>
+                  <div class="mt-1 flex items-center gap-1.5 text-[11px] font-bold text-ink-muted">
+                    <span>${blocks.length === 0 ? "Open" : `${doneCount}/${blocks.length} done`}</span>
+                    ${journal.mood ? `<span>${journal.mood}</span>` : ""}
+                  </div>
+                </div>
+
+                <!-- Column Tasks -->
+                <div class="mt-3 flex-1 space-y-2">
+                  ${
+                    blocks.length === 0
+                      ? `<div class="h-full flex items-center justify-center text-center px-2 py-8">
+                           <span class="font-journal text-sm text-ink-light opacity-80 group-hover:text-ink-muted transition">
+                             Click to plan day
+                           </span>
+                         </div>`
+                      : blocks
+                          .map((b) => {
+                            const theme =
+                              PASTEL_COLORS[b.color] || PASTEL_COLORS.sage;
+                            return `
+                              <div
+                                class="rounded-[15px] border p-2 transition ${b.completed ? "opacity-65" : ""}"
+                                style="background-color: ${theme.bg}; border-color: ${theme.border};"
+                              >
+                                <div class="flex items-center justify-between gap-1 text-[10px] font-extrabold" style="color: ${theme.accent};">
+                                  <span>${formatDisplayTime(b.start)}</span>
+                                  <span>${escapeHTML(b.emoji || "✨")}</span>
+                                </div>
+                                <div class="mt-0.5 font-journal text-[15px] leading-snug text-ink line-clamp-2 ${b.completed ? "line-through decoration-2 decoration-[#4B3E36]/75" : ""}">
+                                  ${escapeHTML(b.title)}
+                                </div>
+                              </div>
+                            `;
+                          })
+                          .join("")
+                  }
+                </div>
+
+                <!-- Subtle Footer Prompt -->
+                <div class="mt-3 pt-2 border-t border-paper-border/60 text-center">
+                  <span class="text-[11px] font-bold text-ink-muted group-hover:text-ink transition">
+                    Open Day Planner →
+                  </span>
+                </div>
+              </div>
+            `;
+            })
+            .join("");
+
+          return `
+          <div class="space-y-4">
+            <!-- Mobile Layout -->
+            <div class="md:hidden space-y-4">
+              <div class="grid grid-cols-7 gap-1.5">
+                ${mobileStripHTML}
+              </div>
+              <div class="space-y-3">
+                ${mobileCardsHTML}
+              </div>
+            </div>
+
+            <!-- Desktop 7-Column Layout -->
+            <div class="hidden md:grid md:grid-cols-7 gap-3">
+              ${desktopBoardHTML}
+            </div>
+          </div>
+        `;
+        }
+
+        /* =================================================================== */
+        /* 10. MONTH VIEW (Desktop Default, Responsive Rounded Grid)           */
+        /* =================================================================== */
+        function renderMonthView() {
+          const d = parseDateKey(state.selectedDate);
+          const year = d.getFullYear();
+          const month = d.getMonth();
+          const tKey = todayKey();
+
+          const firstDayOfMonth = new Date(year, month, 1);
+          const startOffset = (firstDayOfMonth.getDay() + 6) % 7; // Monday = 0
+          const gridStart = new Date(year, month, 1 - startOffset);
+
+          // Determine whether 5 or 6 rows needed
+          const daysInMonth = new Date(year, month + 1, 0).getDate();
+          const totalCells = startOffset + daysInMonth > 35 ? 42 : 35;
+
+          const cellsHTML = Array.from({ length: totalCells }, (_, idx) => {
+            const cellDate = new Date(gridStart);
+            cellDate.setDate(gridStart.getDate() + idx);
+            const dk = toDateKey(cellDate);
+            const inCurrentMonth = cellDate.getMonth() === month;
+            const isT = dk === tKey;
+            const blocks = getBlocksForDate(dk);
+            const journal = getJournalForDate(dk);
+            const maxVisible = 3;
+
+            return `
+            <button
+              type="button"
+              data-open-day="${dk}"
+              class="group relative flex flex-col items-stretch text-left rounded-[18px] sm:rounded-[22px] border p-1.5 sm:p-2.5 transition min-h-[76px] sm:min-h-[124px] lg:min-h-[138px] ${
+                isT
+                  ? "border-[#DFB49D] bg-[#FFFBF6] shadow-paper"
+                  : inCurrentMonth
+                    ? "border-paper-border bg-paper-card shadow-card hover:border-ink/35 hover:-translate-y-0.5"
+                    : "border-paper-border/50 bg-paper-soft/55 opacity-60 hover:opacity-90"
+              }"
+            >
+              <!-- Date Header Row -->
+              <div class="flex items-center justify-between">
+                <span class="relative inline-flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center font-hand text-[22px] sm:text-[26px] font-bold leading-none ${
+                  inCurrentMonth ? "text-ink" : "text-ink-muted"
+                }">
+                  ${cellDate.getDate()}
+                  ${isT ? svgTodayLoop("w-10 h-9 sm:w-11 sm:h-10") : ""}
+                </span>
+                <span class="text-xs sm:text-sm">${journal.mood || ""}</span>
+              </div>
+
+              <!-- Desktop / Tablet: Pastel Task Preview Pills -->
+              <div class="hidden sm:flex flex-col gap-1 mt-1.5 flex-1">
+                ${blocks
+                  .slice(0, maxVisible)
+                  .map((b) => {
+                    const theme = PASTEL_COLORS[b.color] || PASTEL_COLORS.sage;
+                    return `
+                      <div
+                        class="flex items-center gap-1 rounded-[10px] border px-2 py-0.5 text-xs truncate ${b.completed ? "opacity-60" : ""}"
+                        style="background-color: ${theme.bg}; border-color: ${theme.border};"
+                      >
+                        <span class="shrink-0 text-[11px]">${escapeHTML(b.emoji || "✨")}</span>
+                        <span class="font-journal text-[14px] text-ink truncate ${b.completed ? "line-through decoration-[1.8px] decoration-[#4B3E36]/75" : ""}">
+                          ${escapeHTML(b.title)}
+                        </span>
+                      </div>
+                    `;
+                  })
+                  .join("")}
+                ${
+                  blocks.length > maxVisible
+                    ? `<span class="px-1.5 text-[11px] font-extrabold text-ink-muted">+${blocks.length - maxVisible} more</span>`
+                    : ""
+                }
+              </div>
+
+              <!-- Mobile Compact Dots inside Month Cells (no overflow) -->
+              <div class="flex sm:hidden flex-wrap gap-1 mt-auto pt-1 px-0.5">
+                ${blocks
+                  .slice(0, 5)
+                  .map((b) => {
+                    const theme = PASTEL_COLORS[b.color] || PASTEL_COLORS.sage;
+                    return `<span class="h-2 w-2 rounded-full" style="background-color: ${theme.accent}; opacity: ${b.completed ? 0.38 : 0.9};"></span>`;
+                  })
+                  .join("")}
+              </div>
+            </button>
+          `;
+          }).join("");
+
+          return `
+          <section class="space-y-2.5">
+            <!-- Weekday Headers -->
+            <div class="grid grid-cols-7 gap-1.5 sm:gap-2.5 px-1">
+              ${WEEKDAY_MON_FIRST.map(
+                (w) => `
+                  <div class="text-center font-hand text-xl sm:text-2xl font-bold text-ink-muted">
+                    ${w}
+                  </div>
+                `,
+              ).join("")}
+            </div>
+
+            <!-- Month Rounded Cells Grid -->
+            <div class="grid grid-cols-7 gap-1.5 sm:gap-2.5">
+              ${cellsHTML}
+            </div>
+
+            <p class="text-center text-xs font-semibold text-ink-muted pt-1">
+              Click any date to open its Journal Day Planner
+            </p>
+          </section>
+        `;
+        }
+
+        /* =================================================================== */
+        /* 11. YEAR VIEW (12 Rounded Mini-Month Journal Cards)                 */
+        /* =================================================================== */
+        function renderYearView() {
+          const year = parseDateKey(state.selectedDate).getFullYear();
+          const tKey = todayKey();
+
+          const monthsHTML = Array.from({ length: 12 }, (_, mIdx) => {
+            const firstDay = new Date(year, mIdx, 1);
+            const startOffset = (firstDay.getDay() + 6) % 7;
+            const daysInMonth = new Date(year, mIdx + 1, 0).getDate();
+
+            const blanks = Array.from(
+              { length: startOffset },
+              () => `<div></div>`,
+            ).join("");
+            const dayButtons = Array.from(
+              { length: daysInMonth },
+              (_, dIdx) => {
+                const dayNum = dIdx + 1;
+                const dk = `${year}-${pad2(mIdx + 1)}-${pad2(dayNum)}`;
+                const isT = dk === tKey;
+                const blocks = state.data.blocksByDate[dk] || [];
+                const hasBlocks = blocks.length > 0;
+                const allDone = hasBlocks && blocks.every((b) => b.completed);
+
+                return `
+              <button
+                type="button"
+                data-open-day="${dk}"
+                class="relative flex flex-col items-center justify-center rounded-[10px] py-1 transition hover:bg-paper-soft min-h-[32px]"
+                title="${MONTH_SHORT[mIdx]} ${dayNum}, ${year}${hasBlocks ? ` (${blocks.length} blocks)` : ""}"
+              >
+                <span class="relative font-hand text-[19px] font-bold leading-none ${isT ? "text-ink-terracotta" : "text-ink"}">
+                  ${dayNum}
+                  ${isT ? svgTodayLoop("w-7 h-7") : ""}
+                </span>
+                <span class="mt-0.5 h-1.5 w-1.5 rounded-full ${
+                  hasBlocks
+                    ? allDone
+                      ? "bg-ink-sage"
+                      : "bg-ink-terracotta"
+                    : "bg-transparent"
+                }"></span>
+              </button>
+            `;
+              },
+            ).join("");
+
+            return `
+            <article class="rounded-[24px] border border-paper-border bg-paper-card p-4 shadow-paper transition hover:border-ink/30">
+              <div class="flex items-center justify-between mb-2.5 pb-1.5 border-b border-paper-border/70">
+                <button
+                  type="button"
+                  data-open-month="${year}-${pad2(mIdx + 1)}-01"
+                  class="font-hand text-3xl font-bold text-ink hover:text-ink-terracotta transition leading-none"
+                >
+                  ${MONTH_NAMES[mIdx]}
+                </button>
+                <span class="text-[11px] font-bold text-ink-light">${year}</span>
+              </div>
+              <div class="grid grid-cols-7 gap-0.5 text-center mb-1">
+                ${WEEKDAY_INITIALS.map((w) => `<span class="text-[10px] font-extrabold text-ink-muted">${w}</span>`).join("")}
+              </div>
+              <div class="grid grid-cols-7 gap-0.5">
+                ${blanks}
+                ${dayButtons}
+              </div>
+            </article>
+          `;
+          }).join("");
+
+          return `
+          <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            ${monthsHTML}
+          </section>
+        `;
+        }
+
+        /* =================================================================== */
+        /* 12. DAY JOURNAL INTERACTIONS (Auto-saving notes & moods)            */
+        /* =================================================================== */
+        function attachDayViewEvents() {
+          const notesEl = document.getElementById("journal-notes");
+          const gratEl = document.getElementById("journal-gratitude");
+          const statusEl = document.getElementById("journal-save-status");
+
+          const saveJournalFields = () => {
+            const dk = state.selectedDate;
+            const prev = getJournalForDate(dk);
+            state.data.journalByDate[dk] = {
+              ...prev,
+              gratitude: gratEl ? gratEl.value : prev.gratitude,
+              notes: notesEl ? notesEl.value : prev.notes,
+            };
+            saveToStorage(true);
+            if (statusEl) {
+              statusEl.classList.remove("opacity-0");
+              clearTimeout(state.journalSaveTimer);
+              state.journalSaveTimer = setTimeout(() => {
+                statusEl.classList.add("opacity-0");
+              }, 1500);
+            }
+          };
+
+          if (notesEl) notesEl.addEventListener("input", saveJournalFields);
+          if (gratEl) gratEl.addEventListener("input", saveJournalFields);
+        }
+
+        /* =================================================================== */
+        /* 13. LIVE HOURS-LEFT UPDATER                                         */
+        /* =================================================================== */
+        function refreshLiveHoursLeft() {
+          const textEl = document.getElementById("live-hours-left-text");
+          const clockEl = document.getElementById("live-clock-now");
+          const barEl = document.getElementById("live-day-progress-bar");
+          const pctEl = document.getElementById("live-day-pct");
+          if (!textEl) return;
+
+          const dayClock = getHoursLeftToday();
+          textEl.textContent = `${dayClock.remainingText} left in today`;
+          if (clockEl)
+            clockEl.textContent = formatDisplayTime(dayClock.nowHHMM);
+          if (barEl) barEl.style.width = `${dayClock.pctElapsed.toFixed(1)}%`;
+          if (pctEl)
+            pctEl.textContent = `${Math.round(dayClock.pctElapsed)}% of today passed`;
+        }
+
+        /* =================================================================== */
+        /* 14. TIME BLOCK MODAL (ADD / EDIT / DELETE)                          */
+        /* =================================================================== */
+        function buildModalPickers() {
+          // Quick Emoji Buttons
+          const emojiWrap = document.getElementById("emoji-picker");
+          emojiWrap.innerHTML = QUICK_EMOJIS.map(
+            (em) => `
+            <button
+              type="button"
+              data-pick-emoji="${em}"
+              class="h-9 w-9 rounded-[12px] border border-paper-border bg-paper-bg text-lg transition hover:bg-paper-soft hover:scale-105"
+            >
+              ${em}
+            </button>
+          `,
+          ).join("");
+
+          // Pastel Color Swatches
+          const colorWrap = document.getElementById("color-picker");
+          colorWrap.innerHTML = Object.entries(PASTEL_COLORS)
+            .map(
+              ([key, c]) => `
+              <button
+                type="button"
+                data-pick-color="${key}"
+                class="color-swatch flex flex-col items-center justify-center rounded-[16px] border-2 py-2 px-1 transition"
+                style="background-color: ${c.bg}; border-color: ${c.border};"
+              >
+                <span class="h-4 w-4 rounded-full mb-1" style="background-color: ${c.accent};"></span>
+                <span class="text-[11px] font-bold text-ink">${c.name}</span>
+              </button>
+            `,
+            )
+            .join("");
+        }
+
+        function selectModalColor(colorKey) {
+          document.querySelectorAll(".color-swatch").forEach((btn) => {
+            const active = btn.dataset.pickColor === colorKey;
+            btn.dataset.selected = active ? "true" : "false";
+            btn.style.boxShadow = active ? "0 0 0 2.5px #2D2622" : "none";
+            btn.style.transform = active ? "scale(1.03)" : "scale(1)";
+          });
+        }
+
+        function getSelectedModalColor() {
+          const active = document.querySelector(
+            '.color-swatch[data-selected="true"]',
+          );
+          return active ? active.dataset.pickColor : "sage";
+        }
+
+        function renderModalSubtasks() {
+          const wrap = document.getElementById("modal-subtasks-list");
+          if (!wrap) return;
+          wrap.innerHTML = state.modalSubtasks
+            .map(
+              (st, i) => `
+              <div class="flex items-center justify-between gap-2 rounded-[14px] border border-paper-border bg-paper-bg px-3 py-1.5">
+                <span class="font-journal text-base text-ink truncate">${escapeHTML(st.text)}</span>
+                <button
+                  type="button"
+                  data-remove-subtask="${i}"
+                  aria-label="Remove step"
+                  class="text-xs font-extrabold text-ink-muted hover:text-rose-700 px-1.5 py-0.5"
+                >
+                  ✕
+                </button>
+              </div>
+            `,
+            )
+            .join("");
+        }
+
+        function updateModalDurationPreview() {
+          const startVal = document.getElementById("block-start").value;
+          const endVal = document.getElementById("block-end").value;
+          const preview = document.getElementById("modal-duration-preview");
+          const errEl = document.getElementById("modal-time-error");
+
+          const s = timeToMinutes(startVal);
+          const e = timeToMinutes(endVal);
+          if (e <= s) {
+            preview.textContent = "";
+            errEl.textContent = "End time should be after start time.";
+            errEl.classList.remove("hidden");
+            return false;
+          }
+          errEl.classList.add("hidden");
+          preview.textContent = `Duration: ${formatDuration(e - s)}`;
+          return true;
+        }
+
+        function openBlockModal({
+          dateKey,
+          block = null,
+          presetStart = null,
+          presetEnd = null,
+        }) {
+          const dk = dateKey || state.selectedDate;
+          const d = parseDateKey(dk);
+          const modal = document.getElementById("modal-block");
+          const titleHeading = document.getElementById("modal-block-title");
+          const dateLabel = document.getElementById("modal-block-date-label");
+          const deleteWrap = document.getElementById("delete-block-wrap");
+          const deleteBtn = document.getElementById("btn-delete-block");
+
+          state.deleteConfirmArmed = false;
+          deleteBtn.textContent = "Delete";
+          deleteBtn.className =
+            "rounded-[16px] border border-rose-200 bg-rose-50 px-3.5 py-2.5 text-xs font-extrabold text-rose-700 transition hover:bg-rose-100 min-h-[42px]";
+
+          document.getElementById("block-date").value = dk;
+          dateLabel.textContent = `${DAY_NAMES[d.getDay()]}, ${MONTH_NAMES[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
+
+          if (block) {
+            titleHeading.textContent = "Edit Time Block";
+            document.getElementById("block-id").value = block.id;
+            document.getElementById("block-title").value = block.title;
+            document.getElementById("block-emoji").value = block.emoji || "✨";
+            document.getElementById("block-start").value = block.start;
+            document.getElementById("block-end").value = block.end;
+            document.getElementById("block-notes").value = block.notes || "";
+            selectModalColor(block.color || "sage");
+            state.modalSubtasks = (block.subtasks || []).map((st) => ({
+              ...st,
+            }));
+            deleteWrap.classList.remove("hidden");
+          } else {
+            titleHeading.textContent = "New Time Block";
+            document.getElementById("block-id").value = "";
+            document.getElementById("block-title").value = "";
+            document.getElementById("block-emoji").value = "✨";
+            document.getElementById("block-notes").value = "";
+
+            // Smart default start/end times
+            let start = presetStart;
+            let end = presetEnd;
+            if (!start) {
+              const existing = getBlocksForDate(dk);
+              if (existing.length > 0) {
+                const lastEnd = timeToMinutes(
+                  existing[existing.length - 1].end,
+                );
+                start = minutesToTime(Math.min(22 * 60, lastEnd + 30));
+              } else {
+                const now = new Date();
+                const nextHour = Math.min(21, Math.max(8, now.getHours() + 1));
+                start = `${pad2(nextHour)}:00`;
+              }
+            }
+            if (!end) {
+              end = minutesToTime(
+                Math.min(23 * 60 + 45, timeToMinutes(start) + 60),
+              );
+            }
+            document.getElementById("block-start").value = start;
+            document.getElementById("block-end").value = end;
+
+            const colorKeys = Object.keys(PASTEL_COLORS);
+            const nextColor =
+              colorKeys[getBlocksForDate(dk).length % colorKeys.length];
+            selectModalColor(nextColor);
+            state.modalSubtasks = [];
+            deleteWrap.classList.add("hidden");
+          }
+
+          renderModalSubtasks();
+          updateModalDurationPreview();
+          modal.classList.remove("hidden");
+          modal.classList.add("flex");
+          setTimeout(() => document.getElementById("block-title").focus(), 60);
+        }
+
+        function closeModal(modalId) {
+          const modal = document.getElementById(modalId);
+          if (!modal) return;
+          modal.classList.add("hidden");
+          modal.classList.remove("flex");
+        }
+
+        /* =================================================================== */
+        /* 15. JSON EXPORT / IMPORT / LOCAL FILE SYNC MODAL                    */
+        /* =================================================================== */
+        function openJsonModal() {
+          const modal = document.getElementById("modal-json");
+          const statsBar = document.getElementById("json-stats-bar");
+          const rawPreview = document.getElementById("raw-json-preview");
+          const fsBadge = document.getElementById("fs-status-badge");
+          const fsButtons = document.getElementById("fs-buttons-wrap");
+          const fsFallback = document.getElementById("fs-fallback-note");
+          const unlinkBtn = document.getElementById("btn-unlink-json");
+
+          // Compute counts
+          const totalDaysWithBlocks = Object.values(
+            state.data.blocksByDate,
+          ).filter((arr) => arr.length > 0).length;
+          const totalBlocks = Object.values(state.data.blocksByDate).reduce(
+            (acc, arr) => acc + arr.length,
+            0,
+          );
+          const totalJournals = Object.values(state.data.journalByDate).filter(
+            (j) =>
+              (j.notes && j.notes.trim()) ||
+              (j.gratitude && j.gratitude.trim()) ||
+              j.mood,
+          ).length;
+
+          statsBar.innerHTML = `
+          <span>📅 ${totalBlocks} time blocks across ${totalDaysWithBlocks} day${totalDaysWithBlocks === 1 ? "" : "s"}</span>
+          <span>📓 ${totalJournals} journal page${totalJournals === 1 ? "" : "s"}</span>
+        `;
+
+          rawPreview.textContent = JSON.stringify(state.data, null, 2);
+
+          // Check File System Access API availability (and top-level context)
+          const fsSupported = typeof window.showSaveFilePicker === "function";
+          if (state.fileHandle) {
+            fsBadge.textContent = `Linked: ${state.linkedFileName}`;
+            fsBadge.className =
+              "rounded-full bg-emerald-100 border border-emerald-300 px-2.5 py-0.5 text-[11px] font-extrabold text-emerald-800";
+            unlinkBtn.classList.remove("hidden");
+          } else {
+            fsBadge.textContent = fsSupported
+              ? "Ready to link"
+              : "Desktop Chromium only";
+            fsBadge.className =
+              "rounded-full bg-paper-card border border-paper-border px-2.5 py-0.5 text-[11px] font-bold text-ink-muted";
+            unlinkBtn.classList.add("hidden");
+          }
+
+          if (!fsSupported) {
+            fsButtons.classList.add("hidden");
+            fsFallback.classList.remove("hidden");
+          } else {
+            fsButtons.classList.remove("hidden");
+            fsFallback.classList.add("hidden");
+          }
+
+          modal.classList.remove("hidden");
+          modal.classList.add("flex");
+        }
+
+        function exportDataToJsonFile() {
+          try {
+            const jsonStr = JSON.stringify(state.data, null, 2);
+            const blob = new Blob([jsonStr], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "journal-planner-data.json";
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+            showToast("Exported journal-planner-data.json ✓");
+          } catch (err) {
+            console.error("Export error:", err);
+            showToast("Could not export .json file", "warn");
+          }
+        }
+
+        function importJsonText(text, mode = "merge") {
+          try {
+            const parsed = JSON.parse(text);
+            if (
+              !parsed ||
+              typeof parsed !== "object" ||
+              (!parsed.blocksByDate && !parsed.journalByDate)
+            ) {
+              showToast("Invalid Ink & Day .json file format", "warn");
+              return;
+            }
+
+            const incomingBlocks = parsed.blocksByDate || {};
+            const incomingJournals = parsed.journalByDate || {};
+
+            if (mode === "replace") {
+              state.data.blocksByDate = incomingBlocks;
+              state.data.journalByDate = incomingJournals;
+            } else {
+              // Merge by date and deduplicate blocks by id
+              Object.entries(incomingBlocks).forEach(([dk, list]) => {
+                if (!Array.isArray(list)) return;
+                const existing = state.data.blocksByDate[dk] || [];
+                const existingIds = new Set(existing.map((b) => b.id));
+                const merged = [...existing];
+                list.forEach((b) => {
+                  if (
+                    b &&
+                    b.title &&
+                    b.start &&
+                    b.end &&
+                    !existingIds.has(b.id)
+                  ) {
+                    merged.push({ ...b, id: b.id || generateId() });
+                  }
+                });
+                state.data.blocksByDate[dk] = merged;
+              });
+
+              Object.entries(incomingJournals).forEach(([dk, j]) => {
+                if (!j || typeof j !== "object") return;
+                const existing = state.data.journalByDate[dk];
+                if (!existing || (!existing.notes && !existing.gratitude)) {
+                  state.data.journalByDate[dk] = { ...j };
+                }
+              });
+            }
+
+            saveToStorage(true);
+            renderApp();
+            openJsonModal();
+            showToast(
+              mode === "replace"
+                ? "Planner restored from .json ✓"
+                : "Merged .json data ✓",
+            );
+          } catch (err) {
+            console.error("JSON import error:", err);
+            showToast("Could not read .json file", "warn");
+          }
+        }
+
+        async function linkNewLocalJsonFile() {
+          try {
+            const handle = await window.showSaveFilePicker({
+              suggestedName: "journal-planner-data.json",
+              types: [
+                {
+                  description: "JSON Files",
+                  accept: { "application/json": [".json"] },
+                },
+              ],
+            });
+            state.fileHandle = handle;
+            state.linkedFileName = handle.name || "journal-planner-data.json";
+            await writeToLinkedFile(true);
+            renderHeader();
+            openJsonModal();
+          } catch (err) {
+            if (err && err.name === "AbortError") return;
+            console.warn("File picker error:", err);
+            document
+              .getElementById("fs-fallback-note")
+              .classList.remove("hidden");
+            showToast(
+              "File linking blocked here — use Export .json instead",
+              "warn",
+            );
+          }
+        }
+
+        async function linkExistingLocalJsonFile() {
+          try {
+            const [handle] = await window.showOpenFilePicker({
+              types: [
+                {
+                  description: "JSON Files",
+                  accept: { "application/json": [".json"] },
+                },
+              ],
+              multiple: false,
+            });
+            const file = await handle.getFile();
+            const text = await file.text();
+            state.fileHandle = handle;
+            state.linkedFileName = handle.name || "journal-planner-data.json";
+            const modeEl = document.querySelector(
+              'input[name="import-mode"]:checked',
+            );
+            importJsonText(text, modeEl ? modeEl.value : "merge");
+            renderHeader();
+            showToast(`Linked to ${state.linkedFileName} ✓`);
+          } catch (err) {
+            if (err && err.name === "AbortError") return;
+            console.warn("Open file picker error:", err);
+            document
+              .getElementById("fs-fallback-note")
+              .classList.remove("hidden");
+            showToast(
+              "File linking blocked here — use Import .json instead",
+              "warn",
+            );
+          }
+        }
+
+        /* =================================================================== */
+        /* 16. EVENT LISTENERS & DELEGATED INTERACTIONS                        */
+        /* =================================================================== */
+        function setupEventListeners() {
+          // Brand logo -> Jump to Today
+          document
+            .getElementById("btn-brand-home")
+            .addEventListener("click", () => {
+              state.selectedDate = todayKey();
+              renderApp();
+            });
+
+          // View Switcher Tabs
+          document.querySelectorAll(".view-tab").forEach((btn) => {
+            btn.addEventListener("click", () => {
+              state.view = btn.dataset.view;
+              state.justCompletedId = null;
+              renderApp();
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            });
+          });
+
+          // Prev / Next / Today Navigation
+          document.getElementById("btn-prev").addEventListener("click", () => {
+            state.justCompletedId = null;
+            if (state.view === "day")
+              state.selectedDate = addDays(state.selectedDate, -1);
+            else if (state.view === "week")
+              state.selectedDate = addDays(state.selectedDate, -7);
+            else if (state.view === "month")
+              state.selectedDate = addMonths(state.selectedDate, -1);
+            else state.selectedDate = addMonths(state.selectedDate, -12);
+            renderApp();
+          });
+
+          document.getElementById("btn-next").addEventListener("click", () => {
+            state.justCompletedId = null;
+            if (state.view === "day")
+              state.selectedDate = addDays(state.selectedDate, 1);
+            else if (state.view === "week")
+              state.selectedDate = addDays(state.selectedDate, 7);
+            else if (state.view === "month")
+              state.selectedDate = addMonths(state.selectedDate, 1);
+            else state.selectedDate = addMonths(state.selectedDate, 12);
+            renderApp();
+          });
+
+          document.getElementById("btn-today").addEventListener("click", () => {
+            state.justCompletedId = null;
+            state.selectedDate = todayKey();
+            renderApp();
+          });
+
+          // 24h / 12h Clock Format Toggle
+          document
+            .getElementById("btn-time-format")
+            .addEventListener("click", () => {
+              state.use24h = !state.use24h;
+              savePreferences();
+              renderApp();
+              showToast(
+                `Switched to ${state.use24h ? "24-hour" : "12-hour"} clock`,
+              );
+            });
+
+          // Header Quick Add Block
+          document
+            .getElementById("btn-quick-add")
+            .addEventListener("click", () => {
+              openBlockModal({ dateKey: state.selectedDate });
+            });
+
+          // Header JSON Sync Modal
+          document
+            .getElementById("btn-open-json")
+            .addEventListener("click", openJsonModal);
+
+          // Close Modal Buttons & Backdrop Clicks
+          document.querySelectorAll("[data-close-modal]").forEach((btn) => {
+            btn.addEventListener("click", () =>
+              closeModal(btn.dataset.closeModal),
+            );
+          });
+
+          ["modal-block", "modal-json"].forEach((id) => {
+            const modal = document.getElementById(id);
+            modal.addEventListener("click", (e) => {
+              if (e.target === modal) closeModal(id);
+            });
+          });
+
+          document.addEventListener("keydown", (e) => {
+            if (e.key === "Escape") {
+              closeModal("modal-block");
+              closeModal("modal-json");
+            }
+          });
+
+          // Delegated Clicks Inside Main App Container
+          document.getElementById("app-main").addEventListener("click", (e) => {
+            // 1. Toggle Subtask
+            const subBtn = e.target.closest("[data-toggle-subtask]");
+            if (subBtn) {
+              e.stopPropagation();
+              const [blockId, subId] = subBtn.dataset.toggleSubtask.split("::");
+              const list = state.data.blocksByDate[state.selectedDate] || [];
+              const blk = list.find((b) => b.id === blockId);
+              if (blk && Array.isArray(blk.subtasks)) {
+                const st = blk.subtasks.find((s) => s.id === subId);
+                if (st) {
+                  st.done = !st.done;
+                  saveToStorage(true);
+                  renderApp();
+                }
+              }
+              return;
+            }
+
+            // 2. Toggle Time Block Completion (triggers animated hand-drawn scribble!)
+            const toggleBtn = e.target.closest("[data-toggle-block]");
+            if (toggleBtn) {
+              e.stopPropagation();
+              const blockId = toggleBtn.dataset.toggleBlock;
+              const list = state.data.blocksByDate[state.selectedDate] || [];
+              const blk = list.find((b) => b.id === blockId);
+              if (blk) {
+                blk.completed = !blk.completed;
+                state.justCompletedId = blk.completed ? blk.id : null;
+                saveToStorage(true);
+
+                // Animate scribble smoothly in-place first, then sync counts cleanly
+                const article = toggleBtn.closest("article[data-block-id]");
+                if (article) {
+                  article.classList.toggle("is-completed", blk.completed);
+                  if (blk.completed) {
+                    article.classList.add("just-completed");
+                  }
+                  setTimeout(() => {
+                    state.justCompletedId = null;
+                    renderApp();
+                  }, 480);
+                } else {
+                  renderApp();
+                }
+              }
+              return;
+            }
+
+            // 3. Edit Time Block
+            const editEl = e.target.closest("[data-edit-block]");
+            if (editEl) {
+              e.stopPropagation();
+              const blockId = editEl.dataset.editBlock;
+              const list = state.data.blocksByDate[state.selectedDate] || [];
+              const blk = list.find((b) => b.id === blockId);
+              if (blk)
+                openBlockModal({ dateKey: state.selectedDate, block: blk });
+              return;
+            }
+
+            // 4. Open Gap Connector -> Pre-fill Add Block Modal
+            const gapBtn = e.target.closest("[data-gap-start]");
+            if (gapBtn) {
+              openBlockModal({
+                dateKey: state.selectedDate,
+                presetStart: gapBtn.dataset.gapStart,
+                presetEnd: gapBtn.dataset.gapEnd,
+              });
+              return;
+            }
+
+            // 5. Quick Add on Day Timeline
+            const addDayBtn = e.target.closest("[data-quick-add-day]");
+            if (addDayBtn) {
+              openBlockModal({ dateKey: addDayBtn.dataset.quickAddDay });
+              return;
+            }
+
+            // 6. Journal Mood Stamp Selection
+            const moodBtn = e.target.closest("[data-mood]");
+            if (moodBtn) {
+              const dk = state.selectedDate;
+              const prev = getJournalForDate(dk);
+              const picked = moodBtn.dataset.mood;
+              state.data.journalByDate[dk] = {
+                ...prev,
+                mood: prev.mood === picked ? "" : picked,
+              };
+              saveToStorage(true);
+              renderApp();
+              return;
+            }
+
+            // 7. Click Month Title in Year View -> Open Month View
+            const monthBtn = e.target.closest("[data-open-month]");
+            if (monthBtn) {
+              state.selectedDate = monthBtn.dataset.openMonth;
+              state.view = "month";
+              renderApp();
+              window.scrollTo({ top: 0, behavior: "smooth" });
+              return;
+            }
+
+            // 8. Click Any Day in Year / Month / Week / Ribbon -> Open Day Planner
+            const dayEl = e.target.closest("[data-open-day]");
+            if (dayEl) {
+              state.selectedDate = dayEl.dataset.openDay;
+              state.view = "day";
+              state.justCompletedId = null;
+              renderApp();
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            }
+          });
+
+          // Modal: Emoji & Color Pickers
+          document
+            .getElementById("emoji-picker")
+            .addEventListener("click", (e) => {
+              const btn = e.target.closest("[data-pick-emoji]");
+              if (btn)
+                document.getElementById("block-emoji").value =
+                  btn.dataset.pickEmoji;
+            });
+
+          document
+            .getElementById("color-picker")
+            .addEventListener("click", (e) => {
+              const btn = e.target.closest("[data-pick-color]");
+              if (btn) selectModalColor(btn.dataset.pickColor);
+            });
+
+          // Modal: Start/End Time & Quick Duration Chips
+          document
+            .getElementById("block-start")
+            .addEventListener("input", updateModalDurationPreview);
+          document
+            .getElementById("block-end")
+            .addEventListener("input", updateModalDurationPreview);
+
+          document.querySelectorAll(".dur-chip").forEach((chip) => {
+            chip.addEventListener("click", () => {
+              const mins = Number(chip.dataset.dur);
+              const startVal =
+                document.getElementById("block-start").value || "09:00";
+              const endMins = Math.min(
+                23 * 60 + 55,
+                timeToMinutes(startVal) + mins,
+              );
+              document.getElementById("block-end").value =
+                minutesToTime(endMins);
+              updateModalDurationPreview();
+            });
+          });
+
+          // Modal: Add / Remove Subtasks
+          const addSubtask = () => {
+            const input = document.getElementById("new-subtask-input");
+            const text = input.value.trim();
+            if (!text) return;
+            state.modalSubtasks.push({
+              id: "st_" + Date.now().toString(36),
+              text,
+              done: false,
+            });
+            input.value = "";
+            renderModalSubtasks();
+          };
+
+          document
+            .getElementById("btn-add-subtask")
+            .addEventListener("click", addSubtask);
+          document
+            .getElementById("new-subtask-input")
+            .addEventListener("keydown", (e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                addSubtask();
+              }
+            });
+          document
+            .getElementById("modal-subtasks-list")
+            .addEventListener("click", (e) => {
+              const btn = e.target.closest("[data-remove-subtask]");
+              if (btn) {
+                state.modalSubtasks.splice(
+                  Number(btn.dataset.removeSubtask),
+                  1,
+                );
+                renderModalSubtasks();
+              }
+            });
+
+          // Modal: Save Block Form Submit
+          document
+            .getElementById("form-block")
+            .addEventListener("submit", (e) => {
+              e.preventDefault();
+              if (!updateModalDurationPreview()) return;
+
+              const id = document.getElementById("block-id").value;
+              const dk =
+                document.getElementById("block-date").value ||
+                state.selectedDate;
+              const title = document.getElementById("block-title").value.trim();
+              if (!title) return;
+
+              const emoji =
+                document.getElementById("block-emoji").value.trim() || "✨";
+              const start = document.getElementById("block-start").value;
+              const end = document.getElementById("block-end").value;
+              const notes = document.getElementById("block-notes").value.trim();
+              const color = getSelectedModalColor();
+
+              if (!state.data.blocksByDate[dk])
+                state.data.blocksByDate[dk] = [];
+              const list = state.data.blocksByDate[dk];
+
+              if (id) {
+                const idx = list.findIndex((b) => b.id === id);
+                if (idx !== -1) {
+                  list[idx] = {
+                    ...list[idx],
+                    title,
+                    emoji,
+                    start,
+                    end,
+                    color,
+                    notes,
+                    subtasks: [...state.modalSubtasks],
+                  };
+                }
+                showToast("Time block updated ✓");
+              } else {
+                list.push({
+                  id: generateId(),
+                  title,
+                  emoji,
+                  start,
+                  end,
+                  color,
+                  notes,
+                  subtasks: [...state.modalSubtasks],
+                  completed: false,
+                });
+                showToast("Time block added ✓");
+              }
+
+              // Switch to Day view for the date we just added to so user sees it immediately
+              state.selectedDate = dk;
+              if (state.view !== "day") state.view = "day";
+
+              saveToStorage(true);
+              closeModal("modal-block");
+              renderApp();
+            });
+
+          // Modal: Two-Step Safe Delete Block
+          document
+            .getElementById("btn-delete-block")
+            .addEventListener("click", () => {
+              const btn = document.getElementById("btn-delete-block");
+              if (!state.deleteConfirmArmed) {
+                state.deleteConfirmArmed = true;
+                btn.textContent = "Tap again to delete";
+                btn.className =
+                  "rounded-[16px] bg-rose-600 px-3.5 py-2.5 text-xs font-extrabold text-white shadow-card transition hover:bg-rose-700 min-h-[42px]";
+                return;
+              }
+
+              const id = document.getElementById("block-id").value;
+              const dk =
+                document.getElementById("block-date").value ||
+                state.selectedDate;
+              if (state.data.blocksByDate[dk]) {
+                state.data.blocksByDate[dk] = state.data.blocksByDate[
+                  dk
+                ].filter((b) => b.id !== id);
+                if (state.data.blocksByDate[dk].length === 0) {
+                  delete state.data.blocksByDate[dk];
+                }
+              }
+              saveToStorage(true);
+              closeModal("modal-block");
+              renderApp();
+              showToast("Time block deleted");
+            });
+
+          // JSON Modal Buttons
+          document
+            .getElementById("btn-export-json")
+            .addEventListener("click", exportDataToJsonFile);
+
+          document
+            .getElementById("btn-import-json")
+            .addEventListener("click", () => {
+              document.getElementById("input-import-json").click();
+            });
+
+          document
+            .getElementById("input-import-json")
+            .addEventListener("change", (e) => {
+              const file = e.target.files && e.target.files[0];
+              if (!file) return;
+              const reader = new FileReader();
+              reader.onload = () => {
+                const modeEl = document.querySelector(
+                  'input[name="import-mode"]:checked',
+                );
+                importJsonText(
+                  String(reader.result || ""),
+                  modeEl ? modeEl.value : "merge",
+                );
+                e.target.value = "";
+              };
+              reader.readAsText(file);
+            });
+
+          document
+            .getElementById("btn-link-new-json")
+            .addEventListener("click", linkNewLocalJsonFile);
+          document
+            .getElementById("btn-link-open-json")
+            .addEventListener("click", linkExistingLocalJsonFile);
+
+          document
+            .getElementById("btn-unlink-json")
+            .addEventListener("click", () => {
+              state.fileHandle = null;
+              state.linkedFileName = null;
+              renderHeader();
+              openJsonModal();
+              showToast("Unlinked local .json file");
+            });
+
+          // Copy Raw JSON (iFrame-safe using execCommand fallback)
+          document
+            .getElementById("btn-copy-json")
+            .addEventListener("click", () => {
+              const jsonText = JSON.stringify(state.data, null, 2);
+              const temp = document.createElement("textarea");
+              temp.value = jsonText;
+              temp.setAttribute("readonly", "");
+              temp.style.position = "fixed";
+              temp.style.opacity = "0";
+              document.body.appendChild(temp);
+              temp.select();
+              try {
+                document.execCommand("copy");
+                showToast("JSON copied to clipboard ✓");
+              } catch (err) {
+                showToast("Could not copy JSON", "warn");
+              }
+              temp.remove();
+            });
+        }
+
+        /* =================================================================== */
+        /* 17. INITIALIZATION                                                  */
+        /* =================================================================== */
+        function init() {
+          loadFromStorage();
+          buildModalPickers();
+          setupEventListeners();
+          renderApp();
+
+          // Keep "Hours Left in Today" countdown and progress bar smoothly updated
+          setInterval(refreshLiveHoursLeft, 15000);
+        }
+
+        window.addEventListener("DOMContentLoaded", init);
+      })();
+    </script>
+  </body>
+</html>
